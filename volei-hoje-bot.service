@@ -1,0 +1,17 @@
+[Unit]
+Description=Bot do Volei de Hoje (WhatsApp)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=voleihoje
+WorkingDirectory=/opt/volei-hoje-bot
+ExecStart=/opt/volei-hoje-bot/volei-hoje-bot
+Environment=VOLEI_DATA=/opt/volei-hoje-bot/dados
+Environment=VOLEI_TZ=America/Sao_Paulo
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
