@@ -17,10 +17,19 @@ const mensagemAbortada = "🚨 *MISSÃO ABORTADA* 🚨\n\n" +
 	"Operação cancelada. Não pergunta, não reclama, não manda áudio de 4 minutos. Só aceita."
 
 type Confirmado struct {
-	IDs  []string `json:"ids"`
-	Nome string   `json:"nome"`
-	Nao  bool     `json:"nao,omitempty"`
+	IDs    []string `json:"ids"`
+	Nome   string   `json:"nome"`
+	Nao    bool     `json:"nao,omitempty"`
+	Talvez bool     `json:"talvez,omitempty"`
 }
+
+type Resposta int
+
+const (
+	Vai Resposta = iota
+	NaoVai
+	Talvez
+)
 
 type Mensagem struct {
 	ID string    `json:"id"`
@@ -302,14 +311,14 @@ func (v *Votacao) Desmarcar(ids []string) {
 	}
 }
 
-func (v *Votacao) Marcar(ids []string, nome string, nao bool) {
+func (v *Votacao) Marcar(ids []string, nome string, r Resposta) {
 	i := v.indice(ids)
 	if i < 0 {
-		v.Confirmados = append(v.Confirmados, Confirmado{IDs: ids, Nome: nome, Nao: nao})
+		v.Confirmados = append(v.Confirmados, Confirmado{IDs: ids, Nome: nome, Nao: r == NaoVai, Talvez: r == Talvez})
 		return
 	}
 	c := &v.Confirmados[i]
-	c.Nao = nao
+	c.Nao, c.Talvez = r == NaoVai, r == Talvez
 	for _, id := range ids {
 		if !contem(c.IDs, id) {
 			c.IDs = append(c.IDs, id)
@@ -340,6 +349,9 @@ func simplifica(s string) string {
 }
 
 func (c Confirmado) marca() string {
+	if c.Talvez {
+		return "🤔"
+	}
 	if c.Nao {
 		return "❌"
 	}
@@ -441,7 +453,7 @@ func (v *Votacao) Render(membros []Membro, hoje time.Time) string {
 	default:
 		onde = " no vôlei do dia " + v.Dia
 	}
-	fmt.Fprintf(&b, "\nComente `!eu` pra confirmar presença%s ou `!nao` se não for. Dá pra trocar quantas vezes quiser.", onde)
+	fmt.Fprintf(&b, "\nComente `!eu` pra confirmar presença%s, `!talvez` se estiver na dúvida ou `!nao` se não for. Dá pra trocar quantas vezes quiser.", onde)
 	return b.String()
 }
 

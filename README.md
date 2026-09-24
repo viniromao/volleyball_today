@@ -2,8 +2,8 @@
 
 Bot de WhatsApp em Go pra confirmar presença no vôlei. Cada grupo tem uma
 votação por dia: virou o dia, a contagem recomeça do zero. A lista mostra
-todo mundo do grupo, com ✅ em quem vai, ❌ em quem não vai e ▫️ em quem ainda
-não respondeu:
+todo mundo do grupo, com ✅ em quem vai, ❌ em quem não vai, 🤔 em quem está na
+dúvida e ▫️ em quem ainda não respondeu:
 
 ```
 🏐 Volei — Hoje Dia 11/09
@@ -11,9 +11,10 @@ não respondeu:
 ✅ Ana
 ❌ Bruno
 ✅ Carla
-▫️ Diego
+🤔 Diego
+▫️ Elisa
 
-Comente !eu pra confirmar presença no vôlei de hoje ou !nao se não for. Dá pra trocar quantas vezes quiser.
+Comente !eu pra confirmar presença no vôlei de hoje, !talvez se estiver na dúvida ou !nao se não for. Dá pra trocar quantas vezes quiser.
 ```
 
 Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
@@ -29,13 +30,14 @@ Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
 | `!volei zerar` | limpa os confirmados do dia |
 | `!eu` | confirma presença |
 | `!nao` | marca que não vai (❌) |
-| `!eu Andressa` / `!nao Andressa Rosa` | marca outra pessoa |
+| `!talvez` | marca que está na dúvida (🤔) |
+| `!eu Andressa` / `!nao Andressa Rosa` / `!talvez Andressa` | marca outra pessoa |
 | `!abortarmissao` | cancela o vôlei de hoje e zera a votação |
 | `!add Jose` / `!add "Jose Maria"` | adiciona um nome que não está no grupo, ou põe de volta quem foi removido |
 | `!remove Jose` / `!remove "Jose Maria"` | tira alguém da lista de vez (ou apaga um nome adicionado com `!add`) |
 | `!volei config` | mostra quem está fora da lista e quem foi incluído à mão |
 
-`!eu` e `!nao` trocam a resposta quantas vezes a pessoa quiser — vale sempre a
+`!eu`, `!nao` e `!talvez` trocam a resposta quantas vezes a pessoa quiser — vale sempre a
 última.
 
 Pra marcar outra pessoa, vale qualquer pedaço do nome dela como aparece na
@@ -51,7 +53,7 @@ da virada do dia começa uma votação nova, sem ninguém confirmado — a do di
 anterior não volta.
 
 Com `!volei 17/09` (ou `!volei churrasco 17/09`) a lista passa a ser pra esse
-dia e continua valendo até ele acabar — `!eu`, `!nao` e `!volei` seguem nela, e
+dia e continua valendo até ele acabar — `!eu`, `!nao`, `!talvez` e `!volei` seguem nela, e
 no próprio dia o título ganha o "Hoje". A data é sempre a próxima vez que esse
 dia chega (em dezembro, `03/01` é janeiro do ano seguinte); data que já passou
 é recusada. Mudar pra outra data começa a lista do zero; mandar a mesma data
@@ -68,7 +70,7 @@ Nome composto vai entre aspas: `!add "Jose Maria"`. Dá pra misturar:
 os dias seguintes — a votação zera na virada do dia, a config não. Quem foi
 tirado some da lista (e da votação do dia), mas se mandar `!eu` ele mesmo
 volta a aparecer naquele dia. Os nomes adicionados com `!add` aparecem com ▫️ como
-qualquer um e dá pra marcar com `!eu Fulano` / `!nao Fulano`. Qualquer pessoa
+qualquer um e dá pra marcar com `!eu Fulano` / `!nao Fulano` / `!talvez Fulano`. Qualquer pessoa
 do grupo pode mexer na config.
 
 ## Lista sem poluir o grupo

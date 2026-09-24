@@ -189,7 +189,7 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	}
 	cmd := strings.ToLower(campos[0])
 	switch cmd {
-	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão", "!add", "!remove":
+	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão", "!add", "!remove", "!talvez":
 	default:
 		return
 	}
@@ -270,15 +270,21 @@ func (b *Bot) aoReceber(evt *events.Message) {
 			aviso, v = g.Config(), nil
 		}
 	default:
-		nao := cmd != "!eu"
+		r := Vai
+		switch cmd {
+		case "!nao", "!não":
+			r = NaoVai
+		case "!talvez":
+			r = Talvez
+		}
 		if resto == "" {
-			v.Marcar(idsDoRemetente(evt.Info, info.Participants), nome, nao)
+			v.Marcar(idsDoRemetente(evt.Info, info.Participants), nome, r)
 		} else {
 			ids, erro := v.Encontrar(membros, resto)
 			if erro != "" {
 				aviso, v = erro, nil
 			} else {
-				v.Marcar(ids, "", nao)
+				v.Marcar(ids, "", r)
 			}
 		}
 	}
