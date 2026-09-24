@@ -24,11 +24,16 @@ Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
 | Comando | O que faz |
 |---|---|
 | `!volei` | mostra a votação de hoje (cria se ainda não existe) |
+| `!volei 17/09` | monta a lista pro dia 17/09 (título `Volei — Dia 17/09`) |
+| `!volei churrasco 17/09` | lista com outro nome: `churrasco — Dia 17/09` |
 | `!volei zerar` | limpa os confirmados do dia |
 | `!eu` | confirma presença |
 | `!nao` | marca que não vai (❌) |
 | `!eu Andressa` / `!nao Andressa Rosa` | marca outra pessoa |
 | `!abortarmissao` | cancela o vôlei de hoje e zera a votação |
+| `!add Jose` / `!add "Jose Maria"` | adiciona um nome que não está no grupo, ou põe de volta quem foi removido |
+| `!remove Jose` / `!remove "Jose Maria"` | tira alguém da lista de vez (ou apaga um nome adicionado com `!add`) |
+| `!volei config` | mostra quem está fora da lista e quem foi incluído à mão |
 
 `!eu` e `!nao` trocam a resposta quantas vezes a pessoa quiser — vale sempre a
 última.
@@ -44,6 +49,27 @@ os confirmados do dia — um `!volei` depois disso começa do zero.
 A data do título é o dia de hoje no fuso de `VOLEI_TZ`. Qualquer comando depois
 da virada do dia começa uma votação nova, sem ninguém confirmado — a do dia
 anterior não volta.
+
+Com `!volei 17/09` (ou `!volei churrasco 17/09`) a lista passa a ser pra esse
+dia e continua valendo até ele acabar — `!eu`, `!nao` e `!volei` seguem nela, e
+no próprio dia o título ganha o "Hoje". A data é sempre a próxima vez que esse
+dia chega (em dezembro, `03/01` é janeiro do ano seguinte); data que já passou
+é recusada. Mudar pra outra data começa a lista do zero; mandar a mesma data
+com outro nome só troca o nome e mantém quem já respondeu. `!abortarmissao`
+cancela o evento marcado e volta pro vôlei de hoje.
+
+## Config do grupo
+
+Sem aspas, cada palavra é um nome: `!add Jose Pedro` adiciona duas pessoas.
+Nome composto vai entre aspas: `!add "Jose Maria"`. Dá pra misturar:
+`!add Pedro "Ana Clara"`.
+
+`!add` e `!remove` ficam guardados por grupo e valem em todos
+os dias seguintes — a votação zera na virada do dia, a config não. Quem foi
+tirado some da lista (e da votação do dia), mas se mandar `!eu` ele mesmo
+volta a aparecer naquele dia. Os nomes adicionados com `!add` aparecem com ▫️ como
+qualquer um e dá pra marcar com `!eu Fulano` / `!nao Fulano`. Qualquer pessoa
+do grupo pode mexer na config.
 
 ## Lista sem poluir o grupo
 

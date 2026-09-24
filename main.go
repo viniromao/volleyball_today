@@ -163,8 +163,9 @@ func textoDe(msg *waE2E.Message) string {
 	return ""
 }
 
-func (b *Bot) hoje() string {
-	return time.Now().In(b.fuso).Format("02/01")
+func (b *Bot) hoje() time.Time {
+	agora := time.Now().In(b.fuso)
+	return time.Date(agora.Year(), agora.Month(), agora.Day(), 0, 0, 0, 0, b.fuso)
 }
 
 func (b *Bot) grupo(chat string) *Grupo {
@@ -188,7 +189,7 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	}
 	cmd := strings.ToLower(campos[0])
 	switch cmd {
-	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão":
+	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão", "!add", "!remove":
 	default:
 		return
 	}
@@ -207,7 +208,7 @@ func (b *Bot) aoReceber(evt *events.Message) {
 		b.responder(chat, "⚠️ Não consegui ver quem está no grupo agora, tenta de novo daqui a pouco.")
 		return
 	}
-	membros, eu := b.membros(ctx, info.Participants)
+	todos, eu := b.membros(ctx, info.Participants)
 	nome := evt.Info.PushName
 	if nome == "" {
 		nome = b.nomeDe(ctx, evt.Info.Sender, evt.Info.SenderAlt)
@@ -215,17 +216,58 @@ func (b *Bot) aoReceber(evt *events.Message) {
 
 	b.mu.Lock()
 	g := b.grupo(chat.String())
-	v := g.Hoje(b.hoje())
+	hoje := b.hoje()
+	v := g.Atual(hoje)
+	membros := g.Ajustar(todos)
 	var aviso string
-	chamada := "Lista atualizada do *Volei*"
 	abortou := cmd == "!abortarmissao" || cmd == "!abortarmissão"
 	switch {
 	case abortou:
-		v.Zerar(b.hoje())
-		chamada = "*Missão abortada*"
+		v = g.Agendar(v, "", hoje)
+		v.Zerar()
+	case cmd == "!add" || cmd == "!remove":
+		nomes := nomesDe(resto)
+		if len(nomes) == 0 {
+			aviso = fmt.Sprintf("Manda o nome: `%s Fulano`, ou `%s \"Jose Maria\"` pra nome composto.", cmd, cmd)
+		}
+		var erros []string
+		for _, n := range nomes {
+			var erro string
+			if cmd == "!add" {
+				erro = g.Incluir(membros, n)
+			} else {
+				erro = g.Tirar(v, membros, n)
+			}
+			if erro != "" {
+				erros = append(erros, erro)
+			}
+			membros = g.Ajustar(todos)
+		}
+		if len(erros) > 0 {
+			aviso = strings.Join(erros, "\n")
+		}
+		if len(erros) == len(nomes) {
+			v = nil
+		}
 	case cmd == "!volei" || cmd == "!vôlei":
-		if campos := strings.Fields(resto); len(campos) > 0 && strings.EqualFold(campos[0], "zerar") {
-			v.Zerar(b.hoje())
+		campos := strings.Fields(resto)
+		if len(campos) == 0 {
+			break
+		}
+		if dia, erro, ok := LerData(campos[len(campos)-1], hoje); ok {
+			if erro != "" {
+				aviso, v = erro, nil
+				break
+			}
+			nome := strings.TrimFunc(normaliza(strings.Join(campos[:len(campos)-1], " ")), ehAspas)
+			v = g.Agendar(v, normaliza(nome), dia)
+			break
+		}
+		switch strings.ToLower(campos[0]) {
+		case "zerar":
+			v.Zerar()
+		case "config":
+			aviso, v = g.Config(), nil
 		}
 	default:
 		nao := cmd != "!eu"
@@ -240,13 +282,13 @@ func (b *Bot) aoReceber(evt *events.Message) {
 			}
 		}
 	}
-	saida := ""
+	saida, chamada := "", ""
 	switch {
 	case v == nil:
 	case abortou:
-		saida = mensagemAbortada
+		saida, chamada = mensagemAbortada, "*Missão abortada*"
 	default:
-		saida = v.Render(membros)
+		saida, chamada = v.Render(membros, hoje), v.Chamada()
 	}
 	b.mu.Unlock()
 
