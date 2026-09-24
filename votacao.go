@@ -16,11 +16,37 @@ const maxMensagens = 30
 const mensagemAbortada = "🚨 *MISSÃO ABORTADA* 🚨\n\n" +
 	"Operação cancelada. Não pergunta, não reclama, não manda áudio de 4 minutos. Só aceita."
 
+const mensagemAjuda = "🏐 *Comandos do bot do Volei*\n\n" +
+	"*Responder*\n" +
+	"• `!eu` — vou (✅)\n" +
+	"• `!nao` — não vou (❌)\n" +
+	"• `!talvez` — tô na dúvida (🤔)\n" +
+	"• `!eu Fulano`, `!nao Fulano`, `!talvez Fulano` — marca outra pessoa. Vale um pedaço do nome, sem ligar pra maiúscula nem acento. Se tiver mais de um com o nome, o bot mostra as opções numeradas e você manda `!eu jose 2`.\n" +
+	"Dá pra trocar a resposta quantas vezes quiser, vale a última.\n\n" +
+	"*Lista*\n" +
+	"• `!volei` — mostra a lista (a de hoje, ou a do dia marcado)\n" +
+	"• `!volei 17/09` — monta a lista pro dia 17/09. Ela vale até esse dia acabar; trocar de data começa do zero\n" +
+	"• `!volei churrasco 17/09` — mesma coisa, com outro nome no título\n" +
+	"• `!volei zerar` — limpa as respostas, mantendo dia e nome\n" +
+	"• `!abortarmissao` — cancela o evento e volta pro vôlei de hoje, do zero\n\n" +
+	"*Pagamento*\n" +
+	"• `!temquepagar` — liga a cobrança na lista atual: quem vai ganha 💸 embaixo do nome\n" +
+	"• `!temquepagar 82,20` — idem, mostrando o valor por pessoa embaixo do título\n" +
+	"• `!paguei` / `!paguei Fulano` — marca que pagou (💰); quem paga sem ter confirmado vira ✅\n" +
+	"Toda lista nova começa sem cobrança.\n\n" +
+	"*Quem aparece na lista* (fica guardado pro grupo, vale todo dia)\n" +
+	"• `!add Jose` — adiciona alguém que não está no grupo, ou põe de volta quem foi removido\n" +
+	"• `!remove Jose` — tira alguém da lista de vez\n" +
+	"• Nome composto vai entre aspas: `!add \"Jose Maria\"`. Sem aspas, cada palavra é uma pessoa: `!add Jose Joao` adiciona duas\n" +
+	"• `!volei config` — mostra quem foi removido e quem foi adicionado\n\n" +
+	"• `!volei ajuda` — esta mensagem"
+
 type Confirmado struct {
 	IDs    []string `json:"ids"`
 	Nome   string   `json:"nome"`
 	Nao    bool     `json:"nao,omitempty"`
 	Talvez bool     `json:"talvez,omitempty"`
+	Pago   bool     `json:"pago,omitempty"`
 }
 
 type Resposta int
@@ -40,6 +66,8 @@ type Votacao struct {
 	Dia         string       `json:"dia"`
 	Data        string       `json:"data,omitempty"`
 	Nome        string       `json:"nome,omitempty"`
+	Cobranca    bool         `json:"cobranca,omitempty"`
+	Valor       string       `json:"valor,omitempty"`
 	Confirmados []Confirmado `json:"confirmados"`
 	Mensagens   []Mensagem   `json:"mensagens"`
 	Envios      int          `json:"envios,omitempty"`
@@ -87,7 +115,7 @@ func (g *Grupo) oculto(ids []string) bool {
 }
 
 func (g *Grupo) Tirar(v *Votacao, membros []Membro, busca string) string {
-	ln, erro := buscar(v.linhas(membros), busca)
+	ln, erro, _ := buscar(v.linhas(membros), busca)
 	if erro != "" {
 		return erro
 	}
@@ -111,18 +139,16 @@ func (g *Grupo) Incluir(membros []Membro, nome string) string {
 	for _, o := range g.Ocultos {
 		ocultos = append(ocultos, linha{ids: o.IDs, nome: o.Nome})
 	}
-	switch achados := casar(ocultos, nome); len(achados) {
-	case 0:
-	case 1:
+	if ln, erro, achou := buscar(ocultos, nome); erro == "" {
 		for i, o := range g.Ocultos {
-			if temAlgum(o.IDs, achados[0].ids) {
+			if temAlgum(o.IDs, ln.ids) {
 				g.Ocultos = append(g.Ocultos[:i], g.Ocultos[i+1:]...)
 				break
 			}
 		}
 		return ""
-	default:
-		return fmt.Sprintf("Achei mais de uma pessoa tirada da lista com *%s*: %s. Manda mais do nome.", nome, juntaNomes(achados))
+	} else if achou {
+		return erro
 	}
 	for _, m := range membros {
 		if simplifica(m.Nome) == simplifica(nome) {
@@ -153,7 +179,8 @@ func ehAspas(r rune) bool {
 }
 
 // nomesDe separa os nomes de um !add/!remove: cada palavra é um nome, e o que
-// estiver entre aspas conta como um nome só.
+// estiver entre aspas conta como um nome só. Um número solto vai junto com o
+// nome de antes, pra escolher entre nomes iguais: jose 2.
 func nomesDe(s string) []string {
 	var nomes []string
 	for {
@@ -176,6 +203,10 @@ func nomesDe(s string) []string {
 				i = len(s)
 			}
 			nome, s = s[:i], s[i:]
+			if _, err := strconv.Atoi(nome); err == nil && len(nomes) > 0 {
+				nomes[len(nomes)-1] += " " + nome
+				continue
+			}
 		}
 		if nome = normaliza(nome); nome != "" {
 			nomes = append(nomes, nome)
@@ -330,9 +361,10 @@ func (v *Votacao) Marcar(ids []string, nome string, r Resposta) {
 }
 
 type linha struct {
-	ids   []string
-	nome  string
-	marca string
+	ids       []string
+	nome      string
+	marca     string
+	pagamento string
 }
 
 var semAcento = strings.NewReplacer(
@@ -358,6 +390,57 @@ func (c Confirmado) marca() string {
 	return "✅"
 }
 
+// pagamento é a linha que vai embaixo do nome quando a lista tem cobrança:
+// quem vai e não pagou fica com 💸; quem pagou fica com 💰 mesmo se desistiu.
+func (v *Votacao) pagamento(c Confirmado) string {
+	switch {
+	case !v.Cobranca:
+		return ""
+	case c.Pago:
+		return "💰 pago"
+	case !c.Nao && !c.Talvez:
+		return "💸 falta pagar"
+	}
+	return ""
+}
+
+// Cobrar liga a cobrança na votação atual e, se vier, troca o valor por pessoa.
+func (v *Votacao) Cobrar(valor string) string {
+	if valor = strings.TrimSpace(valor); valor != "" {
+		centavos, ok := lerValor(valor)
+		if !ok {
+			return fmt.Sprintf("Não entendi o valor *%s*. Manda assim: `!temquepagar 82,20`.", valor)
+		}
+		v.Valor = fmt.Sprintf("%d,%02d", centavos/100, centavos%100)
+	}
+	v.Cobranca = true
+	return ""
+}
+
+var reValor = regexp.MustCompile(`(?i)^(?:r\$)?\s*(\d{1,6})(?:[.,](\d{1,2}))?\s*(?:r\$)?$`)
+
+func lerValor(s string) (int, bool) {
+	m := reValor.FindStringSubmatch(s)
+	if m == nil {
+		return 0, false
+	}
+	reais, _ := strconv.Atoi(m[1])
+	centavos := 0
+	if m[2] != "" {
+		centavos, _ = strconv.Atoi(m[2])
+		if len(m[2]) == 1 {
+			centavos *= 10
+		}
+	}
+	return reais*100 + centavos, true
+}
+
+// Pagar marca que a pessoa pagou; quem paga passa a constar como quem vai.
+func (v *Votacao) Pagar(ids []string, nome string) {
+	v.Marcar(ids, nome, Vai)
+	v.Confirmados[v.indice(ids)].Pago = true
+}
+
 func (v *Votacao) linhas(membros []Membro) []linha {
 	var out []linha
 	vistos := map[int]bool{}
@@ -375,21 +458,26 @@ func (v *Votacao) linhas(membros []Membro) []linha {
 		if nome == "" {
 			nome = m.Nome
 		}
-		out = append(out, linha{ids: m.IDs, nome: nome, marca: c.marca()})
+		out = append(out, linha{ids: m.IDs, nome: nome, marca: c.marca(), pagamento: v.pagamento(c)})
 	}
 	for i, c := range v.Confirmados {
 		if !vistos[i] {
-			out = append(out, linha{ids: c.IDs, nome: c.Nome, marca: c.marca()})
+			out = append(out, linha{ids: c.IDs, nome: c.Nome, marca: c.marca(), pagamento: v.pagamento(c)})
 		}
 	}
+	// Nome igual desempata pelos IDs, pra "jose 2" ser sempre a mesma pessoa.
 	sort.SliceStable(out, func(i, j int) bool {
-		return simplifica(out[i].nome) < simplifica(out[j].nome)
+		a, b := simplifica(out[i].nome), simplifica(out[j].nome)
+		if a != b {
+			return a < b
+		}
+		return strings.Join(out[i].ids, ",") < strings.Join(out[j].ids, ",")
 	})
 	return out
 }
 
 func (v *Votacao) Encontrar(membros []Membro, busca string) ([]string, string) {
-	ln, erro := buscar(v.linhas(membros), busca)
+	ln, erro, _ := buscar(v.linhas(membros), busca)
 	return ln.ids, erro
 }
 
@@ -413,23 +501,41 @@ func casar(linhas []linha, busca string) []linha {
 	return parciais
 }
 
-func buscar(linhas []linha, busca string) (linha, string) {
-	achados := casar(linhas, busca)
-	switch len(achados) {
-	case 0:
-		return linha{}, fmt.Sprintf("Não achei ninguém com *%s* no nome.", normaliza(busca))
-	case 1:
-		return achados[0], ""
+// buscar acha uma pessoa só. Quando mais de uma bate, a resposta numera as
+// opções e dá pra escolher mandando o número no fim: "jose 2". O bool diz se
+// alguém bateu com a busca, mesmo que não tenha dado pra escolher.
+func buscar(linhas []linha, busca string) (linha, string, bool) {
+	alvo := normaliza(busca)
+	achados := casar(linhas, alvo)
+	if len(achados) == 1 {
+		return achados[0], "", true
 	}
-	return linha{}, fmt.Sprintf("Achei mais de uma pessoa com *%s*: %s. Manda mais do nome.", normaliza(busca), juntaNomes(achados))
+	if campos := strings.Fields(alvo); len(campos) > 1 {
+		if n, err := strconv.Atoi(campos[len(campos)-1]); err == nil {
+			nome := strings.Join(campos[:len(campos)-1], " ")
+			if opcoes := casar(linhas, nome); len(opcoes) > 0 {
+				if n >= 1 && n <= len(opcoes) {
+					return opcoes[n-1], "", true
+				}
+				return linha{}, fmt.Sprintf("Não tem o número *%d* pra *%s*:\n%s", n, nome, numera(opcoes)), true
+			}
+		}
+	}
+	if len(achados) == 0 {
+		return linha{}, fmt.Sprintf("Não achei ninguém com *%s* no nome.", alvo), false
+	}
+	return linha{}, fmt.Sprintf("Achei mais de uma pessoa com *%s*:\n%s\nManda mais do nome ou o número no fim, tipo *%s 2*.", alvo, numera(achados), alvo), true
 }
 
-func juntaNomes(linhas []linha) string {
-	var nomes []string
-	for _, ln := range linhas {
-		nomes = append(nomes, ln.nome)
+func numera(linhas []linha) string {
+	var b strings.Builder
+	for i, ln := range linhas {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		fmt.Fprintf(&b, "%d. %s", i+1, strings.TrimSpace(ln.marca+" "+ln.nome))
 	}
-	return strings.Join(nomes, ", ")
+	return b.String()
 }
 
 func (v *Votacao) Render(membros []Membro, hoje time.Time) string {
@@ -441,9 +547,16 @@ func (v *Votacao) Render(membros []Membro, hoje time.Time) string {
 	if ehHoje {
 		quando = "Hoje " + quando
 	}
-	fmt.Fprintf(&b, "🏐 *%s — %s*\n\n", v.Evento(), quando)
+	fmt.Fprintf(&b, "🏐 *%s — %s*\n", v.Evento(), quando)
+	if v.Cobranca && v.Valor != "" {
+		fmt.Fprintf(&b, "Valor por pessoa %s R$\n", v.Valor)
+	}
+	b.WriteString("\n")
 	for _, ln := range linhas {
 		fmt.Fprintf(&b, "%s %s\n", ln.marca, ln.nome)
+		if ln.pagamento != "" {
+			fmt.Fprintf(&b, "  %s\n", ln.pagamento)
+		}
 	}
 	onde := ""
 	switch {
@@ -454,6 +567,9 @@ func (v *Votacao) Render(membros []Membro, hoje time.Time) string {
 		onde = " no vôlei do dia " + v.Dia
 	}
 	fmt.Fprintf(&b, "\nComente `!eu` pra confirmar presença%s, `!talvez` se estiver na dúvida ou `!nao` se não for. Dá pra trocar quantas vezes quiser.", onde)
+	if v.Cobranca {
+		b.WriteString(" Quem já pagou manda `!paguei`.")
+	}
 	return b.String()
 }
 

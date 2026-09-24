@@ -189,7 +189,7 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	}
 	cmd := strings.ToLower(campos[0])
 	switch cmd {
-	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão", "!add", "!remove", "!talvez":
+	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão", "!add", "!remove", "!talvez", "!temquepagar", "!paguei":
 	default:
 		return
 	}
@@ -268,6 +268,22 @@ func (b *Bot) aoReceber(evt *events.Message) {
 			v.Zerar()
 		case "config":
 			aviso, v = g.Config(), nil
+		case "ajuda", "comandos":
+			aviso, v = mensagemAjuda, nil
+		}
+	case cmd == "!temquepagar":
+		if erro := v.Cobrar(resto); erro != "" {
+			aviso, v = erro, nil
+		}
+	case cmd == "!paguei" && !v.Cobranca:
+		aviso, v = "Essa lista não tem cobrança. Manda `!temquepagar` (ou `!temquepagar 82,20`) pra ligar.", nil
+	case cmd == "!paguei":
+		if resto == "" {
+			v.Pagar(idsDoRemetente(evt.Info, info.Participants), nome)
+		} else if ids, erro := v.Encontrar(membros, resto); erro != "" {
+			aviso, v = erro, nil
+		} else {
+			v.Pagar(ids, "")
 		}
 	default:
 		r := Vai

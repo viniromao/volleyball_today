@@ -27,11 +27,14 @@ Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
 | `!volei` | mostra a votação de hoje (cria se ainda não existe) |
 | `!volei 17/09` | monta a lista pro dia 17/09 (título `Volei — Dia 17/09`) |
 | `!volei churrasco 17/09` | lista com outro nome: `churrasco — Dia 17/09` |
+| `!volei ajuda` | mostra todos os comandos com explicação (também `!volei comandos`) |
 | `!volei zerar` | limpa os confirmados do dia |
 | `!eu` | confirma presença |
 | `!nao` | marca que não vai (❌) |
 | `!talvez` | marca que está na dúvida (🤔) |
 | `!eu Andressa` / `!nao Andressa Rosa` / `!talvez Andressa` | marca outra pessoa |
+| `!temquepagar` / `!temquepagar 82,20` | liga a cobrança na lista atual (e define o valor por pessoa) |
+| `!paguei` / `!paguei Andressa` | marca que pagou (💰) |
 | `!abortarmissao` | cancela o vôlei de hoje e zera a votação |
 | `!add Jose` / `!add "Jose Maria"` | adiciona um nome que não está no grupo, ou põe de volta quem foi removido |
 | `!remove Jose` / `!remove "Jose Maria"` | tira alguém da lista de vez (ou apaga um nome adicionado com `!add`) |
@@ -42,8 +45,11 @@ Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
 
 Pra marcar outra pessoa, vale qualquer pedaço do nome dela como aparece na
 lista (`!nao Andressa`, `!nao rosa`), sem ligar pra maiúscula nem acento. Se o
-pedaço bate com mais de uma pessoa, o bot mostra quem achou e não marca
-ninguém; um nome que bate inteiro ganha dos que só contêm o pedaço.
+pedaço bate com mais de uma pessoa, o bot mostra quem achou numerado e não marca
+ninguém — aí é só mandar mais do nome ou o número no fim (`!eu jose 2`), que
+vale até pra duas pessoas com o nome igualzinho. Um nome que bate inteiro ganha
+dos que só contêm o pedaço. No `!add`/`!remove`, o número solto vai junto com o
+nome de antes: `!remove jose 2`.
 
 `!abortarmissao` (ou `!abortarmissão`) manda o aviso de missão abortada e limpa
 os confirmados do dia — um `!volei` depois disso começa do zero.
@@ -59,6 +65,25 @@ dia chega (em dezembro, `03/01` é janeiro do ano seguinte); data que já passou
 é recusada. Mudar pra outra data começa a lista do zero; mandar a mesma data
 com outro nome só troca o nome e mantém quem já respondeu. `!abortarmissao`
 cancela o evento marcado e volta pro vôlei de hoje.
+
+## Cobrança
+
+`!temquepagar` liga a cobrança só na lista atual — toda lista nova (dia novo,
+`!volei 17/09`, `!abortarmissao`) começa sem cobrança. Com valor
+(`!temquepagar 82,20`, também vale `82.20`, `R$ 82,20` ou `82`), aparece
+`Valor por pessoa 82,20 R$` embaixo do título; mandar de novo troca o valor.
+
+Com a cobrança ligada, cada pessoa com ✅ ganha uma linha embaixo do nome:
+
+```
+✅ Ana
+  💸 falta pagar
+✅ Diego
+  💰 pago
+```
+
+`!paguei` marca quem mandou (ou `!paguei Fulano` marca outra pessoa); quem paga
+sem ter confirmado vira ✅. Quem pagou e depois desistiu continua com o 💰.
 
 ## Config do grupo
 
