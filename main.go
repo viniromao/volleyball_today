@@ -189,7 +189,7 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	}
 	cmd := strings.ToLower(campos[0])
 	switch cmd {
-	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão", "!add", "!remove", "!talvez", "!temquepagar", "!paguei":
+	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão", "!add", "!remove", "!talvez", "!temquepagar", "!paguei", "!naopaguei", "!nãopaguei":
 	default:
 		return
 	}
@@ -275,7 +275,7 @@ func (b *Bot) aoReceber(evt *events.Message) {
 		if erro := v.Cobrar(resto); erro != "" {
 			aviso, v = erro, nil
 		}
-	case cmd == "!paguei" && !v.Cobranca:
+	case (cmd == "!paguei" || cmd == "!naopaguei" || cmd == "!nãopaguei") && !v.Cobranca:
 		aviso, v = "Essa lista não tem cobrança. Manda `!temquepagar` (ou `!temquepagar 82,20`) pra ligar.", nil
 	case cmd == "!paguei":
 		if resto == "" {
@@ -284,6 +284,14 @@ func (b *Bot) aoReceber(evt *events.Message) {
 			aviso, v = erro, nil
 		} else {
 			v.Pagar(ids, "")
+		}
+	case cmd == "!naopaguei" || cmd == "!nãopaguei":
+		if resto == "" {
+			v.Despagar(idsDoRemetente(evt.Info, info.Participants))
+		} else if ids, erro := v.Encontrar(membros, resto); erro != "" {
+			aviso, v = erro, nil
+		} else {
+			v.Despagar(ids)
 		}
 	default:
 		r := Vai

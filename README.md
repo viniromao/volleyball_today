@@ -14,6 +14,12 @@ dúvida e ▫️ em quem ainda não respondeu:
 🤔 Diego
 ▫️ Elisa
 
+📊 Resumo
+✅ Confirmados: 2
+🤔 Talvez: 1
+❌ Não vão: 1
+▫️ Sem resposta: 1
+
 Comente !eu pra confirmar presença no vôlei de hoje, !talvez se estiver na dúvida ou !nao se não for. Dá pra trocar quantas vezes quiser.
 ```
 
@@ -35,6 +41,7 @@ Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
 | `!eu Andressa` / `!nao Andressa Rosa` / `!talvez Andressa` | marca outra pessoa |
 | `!temquepagar` / `!temquepagar 82,20` | liga a cobrança na lista atual (e define o valor por pessoa) |
 | `!paguei` / `!paguei Andressa` | marca que pagou (💰) |
+| `!naopaguei` / `!naopaguei Andressa` | desfaz o pagamento (volta pra 💸) |
 | `!abortarmissao` | cancela o vôlei de hoje e zera a votação |
 | `!add Jose` / `!add "Jose Maria"` | adiciona um nome que não está no grupo, ou põe de volta quem foi removido |
 | `!remove Jose` / `!remove "Jose Maria"` | tira alguém da lista de vez (ou apaga um nome adicionado com `!add`) |
@@ -82,8 +89,13 @@ Com a cobrança ligada, cada pessoa com ✅ ganha uma linha embaixo do nome:
   💰 pago
 ```
 
+O resumo no fim da lista ganha também `💰 Pagaram` e `💸 Faltam pagar`.
+
 `!paguei` marca quem mandou (ou `!paguei Fulano` marca outra pessoa); quem paga
 sem ter confirmado vira ✅. Quem pagou e depois desistiu continua com o 💰.
+`!naopaguei` (ou `!naopaguei Fulano`) desfaz o pagamento marcado por engano,
+sem mexer na resposta da pessoa. Dá pra ligar a cobrança sem valor e mandar
+`!temquepagar 82,20` depois — o valor entra e quem já pagou continua pago.
 
 ## Config do grupo
 

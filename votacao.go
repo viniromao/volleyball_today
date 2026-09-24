@@ -33,7 +33,8 @@ const mensagemAjuda = "🏐 *Comandos do bot do Volei*\n\n" +
 	"• `!temquepagar` — liga a cobrança na lista atual: quem vai ganha 💸 embaixo do nome\n" +
 	"• `!temquepagar 82,20` — idem, mostrando o valor por pessoa embaixo do título\n" +
 	"• `!paguei` / `!paguei Fulano` — marca que pagou (💰); quem paga sem ter confirmado vira ✅\n" +
-	"Toda lista nova começa sem cobrança.\n\n" +
+	"• `!naopaguei` / `!naopaguei Fulano` — desfaz o pagamento (volta pra 💸)\n" +
+	"Dá pra ligar sem valor e mandar `!temquepagar 82,20` depois; mandar de novo troca o valor. Toda lista nova começa sem cobrança.\n\n" +
 	"*Quem aparece na lista* (fica guardado pro grupo, vale todo dia)\n" +
 	"• `!add Jose` — adiciona alguém que não está no grupo, ou põe de volta quem foi removido\n" +
 	"• `!remove Jose` — tira alguém da lista de vez\n" +
@@ -390,6 +391,11 @@ func (c Confirmado) marca() string {
 	return "✅"
 }
 
+const (
+	pago       = "💰 pago"
+	faltaPagar = "💸 falta pagar"
+)
+
 // pagamento é a linha que vai embaixo do nome quando a lista tem cobrança:
 // quem vai e não pagou fica com 💸; quem pagou fica com 💰 mesmo se desistiu.
 func (v *Votacao) pagamento(c Confirmado) string {
@@ -397,9 +403,9 @@ func (v *Votacao) pagamento(c Confirmado) string {
 	case !v.Cobranca:
 		return ""
 	case c.Pago:
-		return "💰 pago"
+		return pago
 	case !c.Nao && !c.Talvez:
-		return "💸 falta pagar"
+		return faltaPagar
 	}
 	return ""
 }
@@ -439,6 +445,13 @@ func lerValor(s string) (int, bool) {
 func (v *Votacao) Pagar(ids []string, nome string) {
 	v.Marcar(ids, nome, Vai)
 	v.Confirmados[v.indice(ids)].Pago = true
+}
+
+// Despagar desfaz um !paguei, sem mexer na resposta da pessoa.
+func (v *Votacao) Despagar(ids []string) {
+	if i := v.indice(ids); i >= 0 {
+		v.Confirmados[i].Pago = false
+	}
 }
 
 func (v *Votacao) linhas(membros []Membro) []linha {
@@ -552,11 +565,19 @@ func (v *Votacao) Render(membros []Membro, hoje time.Time) string {
 		fmt.Fprintf(&b, "Valor por pessoa %s R$\n", v.Valor)
 	}
 	b.WriteString("\n")
+	conta := map[string]int{}
 	for _, ln := range linhas {
 		fmt.Fprintf(&b, "%s %s\n", ln.marca, ln.nome)
 		if ln.pagamento != "" {
 			fmt.Fprintf(&b, "  %s\n", ln.pagamento)
 		}
+		conta[ln.marca]++
+		conta[ln.pagamento]++
+	}
+	fmt.Fprintf(&b, "\n📊 *Resumo*\n✅ Confirmados: %d\n🤔 Talvez: %d\n❌ Não vão: %d\n▫️ Sem resposta: %d\n",
+		conta["✅"], conta["🤔"], conta["❌"], conta["▫️"])
+	if v.Cobranca {
+		fmt.Fprintf(&b, "💰 Pagaram: %d\n💸 Faltam pagar: %d\n", conta[pago], conta[faltaPagar])
 	}
 	onde := ""
 	switch {
