@@ -32,6 +32,7 @@ const mensagemAjuda = "🏐 *Comandos do bot do Volei*\n\n" +
 	"*Pagamento*\n" +
 	"• `!temquepagar` — liga a cobrança na lista atual: quem vai ganha 💸 embaixo do nome\n" +
 	"• `!temquepagar 82,20` — idem, mostrando o valor por pessoa embaixo do título\n" +
+	"• `!temquepagar 82,20 fulano@email.com \"Fulano de Tal\"` — idem, com a chave Pix e o nome de quem recebe\n" +
 	"• `!paguei` / `!paguei Fulano` — marca que pagou (💰); quem paga sem ter confirmado vira ✅\n" +
 	"• `!naopaguei` / `!naopaguei Fulano` — desfaz o pagamento (volta pra 💸)\n" +
 	"Dá pra ligar sem valor e mandar `!temquepagar 82,20` depois; mandar de novo troca o valor. Toda lista nova começa sem cobrança.\n\n" +
@@ -69,6 +70,8 @@ type Votacao struct {
 	Nome        string       `json:"nome,omitempty"`
 	Cobranca    bool         `json:"cobranca,omitempty"`
 	Valor       string       `json:"valor,omitempty"`
+	Pix         string       `json:"pix,omitempty"`
+	Favorecido  string       `json:"favorecido,omitempty"`
 	Confirmados []Confirmado `json:"confirmados"`
 	Mensagens   []Mensagem   `json:"mensagens"`
 	Envios      int          `json:"envios,omitempty"`
@@ -410,17 +413,43 @@ func (v *Votacao) pagamento(c Confirmado) string {
 	return ""
 }
 
-// Cobrar liga a cobrança na votação atual e, se vier, troca o valor por pessoa.
-func (v *Votacao) Cobrar(valor string) string {
-	if valor = strings.TrimSpace(valor); valor != "" {
-		centavos, ok := lerValor(valor)
-		if !ok {
-			return fmt.Sprintf("Não entendi o valor *%s*. Manda assim: `!temquepagar 82,20`.", valor)
+// Cobrar liga a cobrança na votação atual. O que vier depois é opcional:
+// valor por pessoa, chave Pix e nome de quem recebe, nessa ordem
+// (`87,29 14357877733 "Vinicius Romao"`); o que não vier fica como estava.
+func (v *Votacao) Cobrar(args string) string {
+	campos := strings.Fields(args)
+	if len(campos) > 1 && strings.EqualFold(campos[0], "r$") {
+		campos = append([]string{"R$" + campos[1]}, campos[2:]...)
+	}
+	if len(campos) > 0 {
+		if centavos, ok := lerValor(campos[0]); ok {
+			v.Valor = fmt.Sprintf("%d,%02d", centavos/100, centavos%100)
+			campos = campos[1:]
+		} else if len(campos) == 1 && !pareceChavePix(campos[0]) {
+			return fmt.Sprintf("Não entendi o valor *%s*. Manda assim: `!temquepagar 82,20`.", campos[0])
 		}
-		v.Valor = fmt.Sprintf("%d,%02d", centavos/100, centavos%100)
+	}
+	if len(campos) > 0 {
+		v.Pix = campos[0]
+		v.Favorecido = strings.TrimFunc(strings.Join(campos[1:], " "), ehAspas)
 	}
 	v.Cobranca = true
 	return ""
+}
+
+// pareceChavePix separa uma chave Pix (CPF, telefone, e-mail, aleatória) de
+// um valor digitado errado, pra `!temquepagar 82,2x` ainda dar erro.
+func pareceChavePix(s string) bool {
+	if strings.Contains(s, "@") || strings.Count(s, "-") >= 4 {
+		return true
+	}
+	digitos := 0
+	for _, r := range s {
+		if unicode.IsDigit(r) {
+			digitos++
+		}
+	}
+	return digitos >= 8
 }
 
 var reValor = regexp.MustCompile(`(?i)^(?:r\$)?\s*(\d{1,6})(?:[.,](\d{1,2}))?\s*(?:r\$)?$`)
@@ -563,6 +592,13 @@ func (v *Votacao) Render(membros []Membro, hoje time.Time) string {
 	fmt.Fprintf(&b, "🏐 *%s — %s*\n", v.Evento(), quando)
 	if v.Cobranca && v.Valor != "" {
 		fmt.Fprintf(&b, "Valor por pessoa %s R$\n", v.Valor)
+	}
+	if v.Cobranca && v.Pix != "" {
+		fmt.Fprintf(&b, "Pix %s", v.Pix)
+		if v.Favorecido != "" {
+			fmt.Fprintf(&b, " (%s)", v.Favorecido)
+		}
+		b.WriteString("\n")
 	}
 	b.WriteString("\n")
 	conta := map[string]int{}

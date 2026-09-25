@@ -40,6 +40,7 @@ Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
 | `!talvez` | marca que está na dúvida (🤔) |
 | `!eu Andressa` / `!nao Andressa Rosa` / `!talvez Andressa` | marca outra pessoa |
 | `!temquepagar` / `!temquepagar 82,20` | liga a cobrança na lista atual (e define o valor por pessoa) |
+| `!temquepagar 82,20 chave "Nome"` | idem, com a chave Pix e o nome de quem recebe |
 | `!paguei` / `!paguei Andressa` | marca que pagou (💰) |
 | `!naopaguei` / `!naopaguei Andressa` | desfaz o pagamento (volta pra 💸) |
 | `!abortarmissao` | cancela o vôlei de hoje e zera a votação |
@@ -79,6 +80,11 @@ cancela o evento marcado e volta pro vôlei de hoje.
 `!volei 17/09`, `!abortarmissao`) começa sem cobrança. Com valor
 (`!temquepagar 82,20`, também vale `82.20`, `R$ 82,20` ou `82`), aparece
 `Valor por pessoa 82,20 R$` embaixo do título; mandar de novo troca o valor.
+Depois do valor dá pra mandar a chave Pix e o nome de quem recebe (entre aspas
+ou não): `!temquepagar 82,20 fulano@email.com "Fulano de Tal"` mostra
+`Pix fulano@email.com (Fulano de Tal)` embaixo do valor. Também dá pra mandar
+só o Pix (`!temquepagar fulano@email.com "Fulano de Tal"`), e o valor fica
+como estava.
 
 Com a cobrança ligada, cada pessoa com ✅ ganha uma linha embaixo do nome:
 
