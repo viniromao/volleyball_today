@@ -340,7 +340,7 @@ func (v *Votacao) Lembrete(pendentes []Membro) (string, []string) {
 		fmt.Fprintf(&b, "@%s\n", m.JID.User)
 		jids = append(jids, m.JID.String())
 	}
-	b.WriteString("\nConsegue avisar se vai? É só mandar `!eu`, `!talvez` ou `!nao` 😊")
+	b.WriteString("\nÉ só mandar `!eu`, `!talvez` ou `!nao` 😊")
 	return b.String(), jids
 }
 
