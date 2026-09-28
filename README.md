@@ -33,6 +33,9 @@ Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
 | `!volei` | mostra a votação de hoje (cria se ainda não existe) |
 | `!volei 17/09` | monta a lista pro dia 17/09 (título `Volei — Dia 17/09`) |
 | `!volei churrasco 17/09` | lista com outro nome: `churrasco — Dia 17/09` |
+| `!volei 17/09 19h` / `!volei churrasco 17/09 19h30` | idem, com horário (`Volei — Dia 17/09 às 19h`) |
+| `!volei 19h` | marca o horário da lista atual (vale `19h`, `19h30`, `19:30`) |
+| `!volei semhora` | tira o horário (e o lembrete) |
 | `!volei ajuda` | mostra todos os comandos com explicação (também `!volei comandos`) |
 | `!volei zerar` | limpa os confirmados do dia |
 | `!eu` | confirma presença |
@@ -73,6 +76,16 @@ dia chega (em dezembro, `03/01` é janeiro do ano seguinte); data que já passou
 é recusada. Mudar pra outra data começa a lista do zero; mandar a mesma data
 com outro nome só troca o nome e mantém quem já respondeu. `!abortarmissao`
 cancela o evento marcado e volta pro vôlei de hoje.
+
+## Lembrete 2h antes
+
+Se a lista tem horário, 2h antes do evento o bot manda uma mensagem marcando
+(com @) todo mundo do grupo que ainda não respondeu, perguntando se vai ou não.
+Quem foi tirado com `!remove` e quem entrou com `!add` (não está no grupo) não
+é marcado; se todo mundo já respondeu, não manda nada. O lembrete sai uma vez
+só por horário — trocar o horário arma de novo. Se o horário for marcado já
+dentro das 2h, o lembrete sai na hora. Mudar a data começa sem horário; mandar
+a mesma data sem horário mantém o que estava. `!abortarmissao` tira o horário.
 
 ## Cobrança
 

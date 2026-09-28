@@ -110,6 +110,8 @@ func main() {
 		fatal(err)
 	}
 
+	go bot.lembrar()
+
 	fmt.Println("🏐 bot do vôlei de hoje no ar. manda !volei no grupo. ctrl+c pra sair.")
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -225,6 +227,7 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	case abortou:
 		v = g.Agendar(v, "", hoje)
 		v.Zerar()
+		v.MarcarHora("")
 	case cmd == "!add" || cmd == "!remove":
 		nomes := nomesDe(resto)
 		if len(nomes) == 0 {
@@ -254,6 +257,18 @@ func (b *Bot) aoReceber(evt *events.Message) {
 		if len(campos) == 0 {
 			break
 		}
+		hora, erro, temHora := LerHora(campos[len(campos)-1])
+		if erro != "" {
+			aviso, v = erro, nil
+			break
+		}
+		if temHora {
+			campos = campos[:len(campos)-1]
+			if len(campos) == 0 {
+				v.MarcarHora(hora)
+				break
+			}
+		}
 		if dia, erro, ok := LerData(campos[len(campos)-1], hoje); ok {
 			if erro != "" {
 				aviso, v = erro, nil
@@ -261,9 +276,14 @@ func (b *Bot) aoReceber(evt *events.Message) {
 			}
 			nome := strings.TrimFunc(normaliza(strings.Join(campos[:len(campos)-1], " ")), ehAspas)
 			v = g.Agendar(v, normaliza(nome), dia)
+			if temHora {
+				v.MarcarHora(hora)
+			}
 			break
 		}
 		switch strings.ToLower(campos[0]) {
+		case "semhora", "semhorario", "semhorário":
+			v.MarcarHora("")
 		case "zerar":
 			v.Zerar()
 		case "config":
@@ -371,6 +391,82 @@ func (b *Bot) publicar(ctx context.Context, chat, eu types.JID, v *Votacao, text
 	}
 }
 
+const antecedencia = 2 * time.Hour
+
+// lembrar confere de tempos em tempos se algum evento com horário começa
+// daqui a 2h e marca quem ainda não respondeu. Cada horário lembra uma vez só.
+func (b *Bot) lembrar() {
+	for {
+		b.lembrarAgora()
+		time.Sleep(30 * time.Second)
+	}
+}
+
+func (b *Bot) lembrarAgora() {
+	if !b.cli.IsConnected() {
+		return
+	}
+	agora := time.Now()
+	b.mu.Lock()
+	pendentes := map[string]*Votacao{}
+	for chat, g := range b.grupos {
+		if len(g.Votacoes) == 0 {
+			continue
+		}
+		v := g.Votacoes[0]
+		inicio, ok := v.Inicio(b.fuso)
+		if ok && !v.Lembrado && !agora.Before(inicio.Add(-antecedencia)) && agora.Before(inicio) {
+			pendentes[chat] = v
+		}
+	}
+	b.mu.Unlock()
+
+	ctx := context.Background()
+	for chat, v := range pendentes {
+		jid, err := types.ParseJID(chat)
+		if err != nil {
+			continue
+		}
+		info, err := b.cli.GetGroupInfo(ctx, jid)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "erro ao buscar o grupo pro lembrete:", err)
+			continue
+		}
+		todos, _ := b.membros(ctx, info.Participants)
+
+		b.mu.Lock()
+		g := b.grupos[chat]
+		if len(g.Votacoes) == 0 || g.Votacoes[0] != v || v.Lembrado {
+			b.mu.Unlock()
+			continue
+		}
+		v.Lembrado = true
+		faltam := v.SemResposta(g.Ajustar(todos))
+		var texto string
+		var marcados []string
+		if len(faltam) > 0 {
+			texto, marcados = v.Lembrete(faltam)
+		}
+		if err := b.Salvar(); err != nil {
+			fmt.Fprintln(os.Stderr, "erro ao salvar:", err)
+		}
+		b.mu.Unlock()
+
+		if texto == "" {
+			continue
+		}
+		_, err = b.cli.SendMessage(ctx, jid, &waE2E.Message{
+			ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+				Text:        proto.String(texto),
+				ContextInfo: &waE2E.ContextInfo{MentionedJID: marcados},
+			},
+		})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "erro ao mandar lembrete:", err)
+		}
+	}
+}
+
 func (b *Bot) membros(ctx context.Context, participantes []types.GroupParticipant) ([]Membro, types.JID) {
 	var proprios []string
 	if id := b.cli.Store.ID; id != nil {
@@ -384,7 +480,7 @@ func (b *Bot) membros(ctx context.Context, participantes []types.GroupParticipan
 	var out []Membro
 	for _, p := range participantes {
 		ids := usuarios(p.JID, p.LID, p.PhoneNumber)
-		m := Membro{IDs: ids, Nome: b.nomeDe(ctx, p.JID, p.PhoneNumber, p.LID)}
+		m := Membro{IDs: ids, Nome: b.nomeDe(ctx, p.JID, p.PhoneNumber, p.LID), JID: p.JID.ToNonAD()}
 		if temAlgum(ids, proprios) {
 			m.Proprio = true
 			eu = p.JID.ToNonAD()

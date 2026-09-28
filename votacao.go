@@ -9,6 +9,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"go.mau.fi/whatsmeow/types"
 )
 
 const maxMensagens = 30
@@ -27,6 +29,8 @@ const mensagemAjuda = "🏐 *Comandos do bot do Volei*\n\n" +
 	"• `!volei` — mostra a lista (a de hoje, ou a do dia marcado)\n" +
 	"• `!volei 17/09` — monta a lista pro dia 17/09. Ela vale até esse dia acabar; trocar de data começa do zero\n" +
 	"• `!volei churrasco 17/09` — mesma coisa, com outro nome no título\n" +
+	"• `!volei 17/09 19h` ou `!volei 19h` — marca o horário (vale `19h`, `19h30`, `19:30`). 2h antes o bot marca quem ainda não respondeu\n" +
+	"• `!volei semhora` — tira o horário (e o lembrete)\n" +
 	"• `!volei zerar` — limpa as respostas, mantendo dia e nome\n" +
 	"• `!abortarmissao` — cancela o evento e volta pro vôlei de hoje, do zero\n\n" +
 	"*Pagamento*\n" +
@@ -68,6 +72,8 @@ type Votacao struct {
 	Dia         string       `json:"dia"`
 	Data        string       `json:"data,omitempty"`
 	Nome        string       `json:"nome,omitempty"`
+	Hora        string       `json:"hora,omitempty"`
+	Lembrado    bool         `json:"lembrado,omitempty"`
 	Cobranca    bool         `json:"cobranca,omitempty"`
 	Valor       string       `json:"valor,omitempty"`
 	Pix         string       `json:"pix,omitempty"`
@@ -229,6 +235,7 @@ type Membro struct {
 	IDs     []string
 	Nome    string
 	Proprio bool
+	JID     types.JID
 }
 
 func normaliza(nome string) string {
@@ -261,6 +268,80 @@ func LerData(s string, hoje time.Time) (time.Time, string, bool) {
 		}
 	}
 	return time.Time{}, fmt.Sprintf("Não dá pra marcar pro dia *%s*: essa data já passou ou não existe.", s), true
+}
+
+var reHora = regexp.MustCompile(`(?i)^(\d{1,2})(?:h(\d{2})?|:(\d{2}))h?s?$`)
+
+// LerHora entende "19h", "19h30" e "19:30" e devolve no formato "15:04". O
+// último bool diz se o texto tem cara de horário, mesmo que inválido.
+func LerHora(s string) (string, string, bool) {
+	m := reHora.FindStringSubmatch(s)
+	if m == nil {
+		return "", "", false
+	}
+	h, _ := strconv.Atoi(m[1])
+	min := 0
+	if mm := m[2] + m[3]; mm != "" {
+		min, _ = strconv.Atoi(mm)
+	}
+	if h > 23 || min > 59 {
+		return "", fmt.Sprintf("Não entendi o horário *%s*. Manda assim: `!volei 19h` ou `!volei 19h30`.", s), true
+	}
+	return fmt.Sprintf("%02d:%02d", h, min), "", true
+}
+
+// MarcarHora troca o horário do evento; horário novo ganha lembrete novo.
+func (v *Votacao) MarcarHora(hora string) {
+	if v.Hora != hora {
+		v.Hora, v.Lembrado = hora, false
+	}
+}
+
+// Inicio é quando o evento começa, se tiver horário marcado.
+func (v *Votacao) Inicio(fuso *time.Location) (time.Time, bool) {
+	if v.Hora == "" || v.Data == "" {
+		return time.Time{}, false
+	}
+	t, err := time.ParseInLocation(formatoData+" 15:04", v.Data+" "+v.Hora, fuso)
+	return t, err == nil
+}
+
+// horario mostra "19h" ou "19h30".
+func (v *Votacao) horario() string {
+	h, m, _ := strings.Cut(v.Hora, ":")
+	h = strings.TrimPrefix(h, "0")
+	if h == "" {
+		h = "0"
+	}
+	if m == "00" {
+		return h + "h"
+	}
+	return h + "h" + m
+}
+
+// SemResposta são os membros do grupo que ainda não responderam e dá pra
+// marcar (quem entrou com !add não está no grupo).
+func (v *Votacao) SemResposta(membros []Membro) []Membro {
+	var out []Membro
+	for _, m := range membros {
+		if !m.Proprio && !m.JID.IsEmpty() && v.indice(m.IDs) < 0 {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// Lembrete é a mensagem de 2h antes, com um @ pra cada um que não respondeu.
+func (v *Votacao) Lembrete(pendentes []Membro) (string, []string) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "⏰ *%s* começa às %s! Ainda não responderam:\n\n", v.Evento(), v.horario())
+	var jids []string
+	for _, m := range pendentes {
+		fmt.Fprintf(&b, "@%s\n", m.JID.User)
+		jids = append(jids, m.JID.String())
+	}
+	b.WriteString("\nVai ou não vai? Manda `!eu`, `!talvez` ou `!nao`.")
+	return b.String(), jids
 }
 
 // Atual devolve a votação que ainda vale: a de hoje ou a de um dia marcado
@@ -588,6 +669,9 @@ func (v *Votacao) Render(membros []Membro, hoje time.Time) string {
 	quando := "Dia " + v.Dia
 	if ehHoje {
 		quando = "Hoje " + quando
+	}
+	if v.Hora != "" {
+		quando += " às " + v.horario()
 	}
 	fmt.Fprintf(&b, "🏐 *%s — %s*\n", v.Evento(), quando)
 	if v.Cobranca && v.Valor != "" {
