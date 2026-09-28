@@ -334,13 +334,13 @@ func (v *Votacao) SemResposta(membros []Membro) []Membro {
 // Lembrete é a mensagem de 2h antes, com um @ pra cada um que não respondeu.
 func (v *Votacao) Lembrete(pendentes []Membro) (string, []string) {
 	var b strings.Builder
-	fmt.Fprintf(&b, "⏰ *%s* começa às %s! Ainda não responderam:\n\n", v.Evento(), v.horario())
+	fmt.Fprintf(&b, "Oi, gente! 🏐 O *%s* começa às %s e ainda falta a resposta de:\n\n", v.Evento(), v.horario())
 	var jids []string
 	for _, m := range pendentes {
 		fmt.Fprintf(&b, "@%s\n", m.JID.User)
 		jids = append(jids, m.JID.String())
 	}
-	b.WriteString("\nVai ou não vai? Manda `!eu`, `!talvez` ou `!nao`.")
+	b.WriteString("\nConsegue avisar se vai? É só mandar `!eu`, `!talvez` ou `!nao` 😊")
 	return b.String(), jids
 }
 
