@@ -24,6 +24,7 @@ const mensagemAjuda = "🏐 *Comandos do bot do Volei*\n\n" +
 	"• `!nao` — não vou (❌)\n" +
 	"• `!talvez` — tô na dúvida (🤔)\n" +
 	"• `!eu Fulano`, `!nao Fulano`, `!talvez Fulano` — marca outra pessoa. Vale um pedaço do nome, sem ligar pra maiúscula nem acento. Se tiver mais de um com o nome, o bot mostra as opções numeradas e você manda `!eu jose 2`.\n" +
+	"Nome com várias palavras sem aspas (`!eu irmao da luana`): o bot pergunta se é uma pessoa só ou várias e você responde com o número da opção. Se a pessoa não estiver na lista, ele pergunta se é pra adicionar (e dá pra cancelar). Vale pra `!add`, `!remove`, `!paguei` e `!naopaguei` também.\n" +
 	"Dá pra trocar a resposta quantas vezes quiser, vale a última.\n\n" +
 	"*Lista*\n" +
 	"• `!volei` — mostra a lista (a de hoje, ou a do dia marcado)\n" +
@@ -43,7 +44,7 @@ const mensagemAjuda = "🏐 *Comandos do bot do Volei*\n\n" +
 	"*Quem aparece na lista* (fica guardado pro grupo, vale todo dia)\n" +
 	"• `!add Jose` — adiciona alguém que não está no grupo, ou põe de volta quem foi removido\n" +
 	"• `!remove Jose` — tira alguém da lista de vez\n" +
-	"• Nome composto vai entre aspas: `!add \"Jose Maria\"`. Sem aspas, cada palavra é uma pessoa: `!add Jose Joao` adiciona duas\n" +
+	"• Nome composto vai entre aspas: `!add \"Jose Maria\"`. Sem aspas, o bot pergunta se `!add Jose Joao` é uma pessoa ou duas\n" +
 	"• `!volei config` — mostra quem foi removido e quem foi adicionado\n\n" +
 	"• `!volei ajuda` — esta mensagem"
 

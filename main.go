@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -33,6 +34,8 @@ type Bot struct {
 	dir    string
 	fuso   *time.Location
 	inicio time.Time
+
+	pendentes []*Pendente
 }
 
 func main() {
@@ -190,10 +193,22 @@ func (b *Bot) aoReceber(evt *events.Message) {
 		return
 	}
 	cmd := strings.ToLower(campos[0])
+	remetente := usuarios(evt.Info.Sender, evt.Info.SenderAlt)
+	resposta := 0
 	switch cmd {
 	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão", "!add", "!remove", "!talvez", "!temquepagar", "!paguei", "!naopaguei", "!nãopaguei":
 	default:
-		return
+		n, err := strconv.Atoi(texto)
+		if err != nil || n <= 0 || strconv.Itoa(n) != texto {
+			return
+		}
+		b.mu.Lock()
+		esperando := b.pendenteDe(evt.Info.Chat.String(), remetente) != nil
+		b.mu.Unlock()
+		if !esperando {
+			return
+		}
+		resposta = n
 	}
 	resto := strings.TrimSpace(texto[len(campos[0]):])
 
@@ -221,37 +236,35 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	hoje := b.hoje()
 	v := g.Atual(hoje)
 	membros := g.Ajustar(todos)
+	l := &Lista{g: g, v: v, todos: todos, membros: membros}
+	if resposta == 0 {
+		if antiga := b.pendenteDe(chat.String(), remetente); antiga != nil {
+			b.esquecer(antiga)
+		}
+	}
 	var aviso string
 	abortou := cmd == "!abortarmissao" || cmd == "!abortarmissão"
 	switch {
+	case resposta > 0:
+		var publica bool
+		if p := b.pendenteDe(chat.String(), remetente); p == nil {
+			v = nil
+		} else if aviso, publica = b.responderPergunta(p, l, resposta); !publica {
+			v = nil
+		}
 	case abortou:
 		v = g.Agendar(v, "", hoje)
 		v.Zerar()
 		v.MarcarHora("")
-	case cmd == "!add" || cmd == "!remove":
-		nomes := nomesDe(resto)
-		if len(nomes) == 0 {
-			aviso = fmt.Sprintf("Manda o nome: `%s Fulano`, ou `%s \"Jose Maria\"` pra nome composto.", cmd, cmd)
-		}
-		var erros []string
-		for _, n := range nomes {
-			var erro string
-			if cmd == "!add" {
-				erro = g.Incluir(membros, n)
-			} else {
-				erro = g.Tirar(v, membros, n)
-			}
-			if erro != "" {
-				erros = append(erros, erro)
-			}
-			membros = g.Ajustar(todos)
-		}
-		if len(erros) > 0 {
-			aviso = strings.Join(erros, "\n")
-		}
-		if len(erros) == len(nomes) {
+	case (cmd == "!paguei" || cmd == "!naopaguei" || cmd == "!nãopaguei") && !v.Cobranca:
+		aviso, v = "Essa lista não tem cobrança. Manda `!temquepagar` (ou `!temquepagar 82,20`) pra ligar.", nil
+	case comNome(cmd) && resto != "":
+		var publica bool
+		if aviso, publica = b.iniciar(chat.String(), remetente, cmd, resto, l); !publica {
 			v = nil
 		}
+	case cmd == "!add" || cmd == "!remove":
+		aviso, v = pedirNome(cmd), nil
 	case cmd == "!volei" || cmd == "!vôlei":
 		campos := strings.Fields(resto)
 		if len(campos) == 0 {
@@ -295,24 +308,10 @@ func (b *Bot) aoReceber(evt *events.Message) {
 		if erro := v.Cobrar(resto); erro != "" {
 			aviso, v = erro, nil
 		}
-	case (cmd == "!paguei" || cmd == "!naopaguei" || cmd == "!nãopaguei") && !v.Cobranca:
-		aviso, v = "Essa lista não tem cobrança. Manda `!temquepagar` (ou `!temquepagar 82,20`) pra ligar.", nil
 	case cmd == "!paguei":
-		if resto == "" {
-			v.Pagar(idsDoRemetente(evt.Info, info.Participants), nome)
-		} else if ids, erro := v.Encontrar(membros, resto); erro != "" {
-			aviso, v = erro, nil
-		} else {
-			v.Pagar(ids, "")
-		}
+		v.Pagar(idsDoRemetente(evt.Info, info.Participants), nome)
 	case cmd == "!naopaguei" || cmd == "!nãopaguei":
-		if resto == "" {
-			v.Despagar(idsDoRemetente(evt.Info, info.Participants))
-		} else if ids, erro := v.Encontrar(membros, resto); erro != "" {
-			aviso, v = erro, nil
-		} else {
-			v.Despagar(ids)
-		}
+		v.Despagar(idsDoRemetente(evt.Info, info.Participants))
 	default:
 		r := Vai
 		switch cmd {
@@ -321,17 +320,9 @@ func (b *Bot) aoReceber(evt *events.Message) {
 		case "!talvez":
 			r = Talvez
 		}
-		if resto == "" {
-			v.Marcar(idsDoRemetente(evt.Info, info.Participants), nome, r)
-		} else {
-			ids, erro := v.Encontrar(membros, resto)
-			if erro != "" {
-				aviso, v = erro, nil
-			} else {
-				v.Marcar(ids, "", r)
-			}
-		}
+		v.Marcar(idsDoRemetente(evt.Info, info.Participants), nome, r)
 	}
+	membros = l.membros
 	saida, chamada := "", ""
 	switch {
 	case v == nil:

@@ -62,6 +62,14 @@ vale até pra duas pessoas com o nome igualzinho. Um nome que bate inteiro ganha
 dos que só contêm o pedaço. No `!add`/`!remove`, o número solto vai junto com o
 nome de antes: `!remove jose 2`.
 
+Quando o nome tem várias palavras sem aspas (`!eu irmao da luana`), o bot pergunta
+se é uma pessoa só ou várias, e a pessoa responde com o número da opção (1 um nome
+só, 2 vários nomes, 3 cancelar). Se alguém de `!eu`/`!nao`/`!talvez`/`!paguei` não
+existe na lista, ele diz isso e pergunta, pessoa por pessoa, se é pra adicionar
+(1 sim, 2 cancelar — cancelar não faz nada). A pergunta vale por 5 minutos e só
+a resposta de quem mandou o comando conta. Entre aspas (`!eu "irmao da luana"`)
+ele não pergunta o formato.
+
 `!abortarmissao` (ou `!abortarmissão`) manda o aviso de missão abortada e limpa
 os confirmados do dia — um `!volei` depois disso começa do zero.
 
