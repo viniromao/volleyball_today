@@ -338,6 +338,10 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	}
 	if v != nil {
 		b.publicar(ctx, chat, eu, v, saida, chamada)
+		if cmd == "!volei" || cmd == "!vôlei" {
+			// horário dentro das 2h já manda o lembrete na hora
+			b.lembrarAgora()
+		}
 	}
 }
 
