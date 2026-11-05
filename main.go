@@ -209,7 +209,7 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	remetente := usuarios(evt.Info.Sender, evt.Info.SenderAlt)
 	resposta := 0
 	switch cmd {
-	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão", "!add", "!remove", "!talvez", "!temquepagar", "!paguei", "!naopaguei", "!nãopaguei":
+	case "!eu", "!nao", "!não", "!volei", "!vôlei", "!abortarmissao", "!abortarmissão", "!add", "!remove", "!talvez", "!temquepagar", "!paguei", "!naopaguei", "!nãopaguei", "!clima":
 	default:
 		n, err := strconv.Atoi(texto)
 		if err != nil || n <= 0 || strconv.Itoa(n) != texto {
@@ -228,6 +228,11 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	chat := evt.Info.Chat
 	if chat.Server != types.GroupServer {
 		b.responder(chat, "Isso só funciona dentro do grupo. 🏐")
+		return
+	}
+
+	if cmd == "!clima" {
+		b.climaSobDemanda(chat)
 		return
 	}
 

@@ -231,3 +231,35 @@ func (b *Bot) climaAgora() {
 		}
 	}
 }
+
+// climaSobDemanda responde ao !clima com a previsão pro horário do evento
+// atual, sem esperar a janela de 1h e sem gastar os avisos automáticos.
+func (b *Bot) climaSobDemanda(chat types.JID) {
+	b.mu.Lock()
+	var v *Votacao
+	if g, ok := b.grupos[chat.String()]; ok && len(g.Votacoes) > 0 {
+		v = g.Votacoes[0]
+	}
+	var inicio time.Time
+	var ok bool
+	if v != nil {
+		inicio, ok = v.Inicio(b.fuso)
+	}
+	b.mu.Unlock()
+
+	if !ok {
+		b.responder(chat, "Sem horário marcado não tem previsão. Manda `!volei 19h` pra marcar. 🏐")
+		return
+	}
+	if !time.Now().Before(inicio) {
+		b.responder(chat, "O horário marcado já passou. 🏐")
+		return
+	}
+	prev, err := b.buscarPrevisao(context.Background(), inicio)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "erro ao buscar a previsão do tempo:", err)
+		b.responder(chat, "⚠️ Não consegui buscar a previsão agora, tenta de novo daqui a pouco.")
+		return
+	}
+	b.responder(chat, v.MensagemClima(prev, 1))
+}

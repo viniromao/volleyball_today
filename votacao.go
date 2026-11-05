@@ -31,6 +31,7 @@ const mensagemAjuda = "🏐 *Comandos do bot do Volei*\n\n" +
 	"• `!volei 17/09` — monta a lista pro dia 17/09. Ela vale até esse dia acabar; trocar de data começa do zero\n" +
 	"• `!volei churrasco 17/09` — mesma coisa, com outro nome no título\n" +
 	"• `!volei 17/09 19h` ou `!volei 19h` — marca o horário (vale `19h`, `19h30`, `19:30`). 2h antes o bot marca quem ainda não respondeu, e avisa a previsão de chuva 1h antes (e alerta com 2h a 4h se a chance for grande)\n" +
+	"• `!clima` — mostra na hora a previsão de chuva pro horário marcado\n" +
 	"• `!volei semhora` — tira o horário (e o lembrete e a previsão)\n" +
 	"• `!volei zerar` — limpa as respostas, mantendo dia e nome\n" +
 	"• `!abortarmissao` — cancela o evento e volta pro vôlei de hoje, do zero\n\n" +

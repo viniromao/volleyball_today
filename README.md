@@ -36,6 +36,7 @@ Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
 | `!volei 17/09 19h` / `!volei churrasco 17/09 19h30` | idem, com horário (`Volei — Dia 17/09 às 19h`) |
 | `!volei 19h` | marca o horário da lista atual (vale `19h`, `19h30`, `19:30`) |
 | `!volei semhora` | tira o horário (e o lembrete e a previsão) |
+| `!clima` | mostra na hora a previsão de chuva pro horário marcado |
 | `!volei ajuda` | mostra todos os comandos com explicação (também `!volei comandos`) |
 | `!volei zerar` | limpa os confirmados do dia |
 | `!eu` | confirma presença |
