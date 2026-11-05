@@ -30,8 +30,8 @@ const mensagemAjuda = "🏐 *Comandos do bot do Volei*\n\n" +
 	"• `!volei` — mostra a lista (a de hoje, ou a do dia marcado)\n" +
 	"• `!volei 17/09` — monta a lista pro dia 17/09. Ela vale até esse dia acabar; trocar de data começa do zero\n" +
 	"• `!volei churrasco 17/09` — mesma coisa, com outro nome no título\n" +
-	"• `!volei 17/09 19h` ou `!volei 19h` — marca o horário (vale `19h`, `19h30`, `19:30`). 2h antes o bot marca quem ainda não respondeu\n" +
-	"• `!volei semhora` — tira o horário (e o lembrete)\n" +
+	"• `!volei 17/09 19h` ou `!volei 19h` — marca o horário (vale `19h`, `19h30`, `19:30`). 2h antes o bot marca quem ainda não respondeu, e avisa a previsão de chuva 1h antes (e alerta com 2h a 4h se a chance for grande)\n" +
+	"• `!volei semhora` — tira o horário (e o lembrete e a previsão)\n" +
 	"• `!volei zerar` — limpa as respostas, mantendo dia e nome\n" +
 	"• `!abortarmissao` — cancela o evento e volta pro vôlei de hoje, do zero\n\n" +
 	"*Pagamento*\n" +
@@ -75,6 +75,7 @@ type Votacao struct {
 	Nome        string       `json:"nome,omitempty"`
 	Hora        string       `json:"hora,omitempty"`
 	Lembrado    bool         `json:"lembrado,omitempty"`
+	ChuvaAvisos int          `json:"chuvaAvisos,omitempty"` // bit k ligado = janela de k horas antes já tratada
 	Cobranca    bool         `json:"cobranca,omitempty"`
 	Valor       string       `json:"valor,omitempty"`
 	Pix         string       `json:"pix,omitempty"`
@@ -291,10 +292,10 @@ func LerHora(s string) (string, string, bool) {
 	return fmt.Sprintf("%02d:%02d", h, min), "", true
 }
 
-// MarcarHora troca o horário do evento; horário novo ganha lembrete novo.
+// MarcarHora troca o horário do evento; horário novo ganha lembrete e avisos de clima novos.
 func (v *Votacao) MarcarHora(hora string) {
 	if v.Hora != hora {
-		v.Hora, v.Lembrado = hora, false
+		v.Hora, v.Lembrado, v.ChuvaAvisos = hora, false, 0
 	}
 }
 

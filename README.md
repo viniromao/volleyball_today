@@ -35,7 +35,7 @@ Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
 | `!volei churrasco 17/09` | lista com outro nome: `churrasco — Dia 17/09` |
 | `!volei 17/09 19h` / `!volei churrasco 17/09 19h30` | idem, com horário (`Volei — Dia 17/09 às 19h`) |
 | `!volei 19h` | marca o horário da lista atual (vale `19h`, `19h30`, `19:30`) |
-| `!volei semhora` | tira o horário (e o lembrete) |
+| `!volei semhora` | tira o horário (e o lembrete e a previsão) |
 | `!volei ajuda` | mostra todos os comandos com explicação (também `!volei comandos`) |
 | `!volei zerar` | limpa os confirmados do dia |
 | `!eu` | confirma presença |
@@ -204,3 +204,13 @@ Logs:
 ```bash
 ssh usuario@vps 'journalctl -u volei-hoje-bot -f'
 ```
+
+## Previsão de chuva
+
+Com horário marcado, o bot consulta o [Open-Meteo](https://open-meteo.com) (grátis, sem chave):
+
+- **1h antes**: sempre manda a previsão pro horário do jogo (chance de chuva, mm e temperatura).
+- **4h, 3h e 2h antes**: só manda um alerta se a chance de chuva for de 60% pra cima.
+
+Cada janela avisa uma vez só; trocar o horário recomeça. Sem horário, não manda nada.
+Por padrão usa as coordenadas de Osasco; dá pra trocar com `VOLEI_LAT` e `VOLEI_LON`.

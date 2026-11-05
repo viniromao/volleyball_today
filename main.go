@@ -35,6 +35,9 @@ type Bot struct {
 	fuso   *time.Location
 	inicio time.Time
 
+	lat, lon   string
+	cacheClima map[string]cachePrevisao
+
 	pendentes []*Pendente
 }
 
@@ -82,6 +85,8 @@ func main() {
 		dir:    dir,
 		fuso:   fuso,
 		inicio: time.Now(),
+		lat:    envOu("VOLEI_LAT", latPadrao),
+		lon:    envOu("VOLEI_LON", lonPadrao),
 	}
 	if err := bot.Carregar(); err != nil {
 		fatal(err)
@@ -114,12 +119,20 @@ func main() {
 	}
 
 	go bot.lembrar()
+	go bot.avisarClima()
 
 	fmt.Println("🏐 bot do vôlei de hoje no ar. manda !volei no grupo. ctrl+c pra sair.")
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	bot.cli.Disconnect()
+}
+
+func envOu(nome, padrao string) string {
+	if v := os.Getenv(nome); v != "" {
+		return v
+	}
+	return padrao
 }
 
 func fatal(err error) {
