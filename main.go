@@ -253,36 +253,46 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	g := b.grupo(chat.String())
 	hoje := b.hoje()
 	v := g.Atual(hoje)
-	membros := g.Ajustar(todos)
-	l := &Lista{g: g, v: v, todos: todos, membros: membros}
+	pag := ehCobranca(cmd)
+	if resposta > 0 {
+		if p := b.pendenteDe(chat.String(), remetente); p != nil {
+			pag = p.pag
+		}
+	}
+	novaCobranca := false
+	if cmd == "!temquepagar" && g.Pagamento == nil {
+		g.Pagamento, novaCobranca = &Cobranca{}, true
+	}
+	l := listaDe(g, v, todos, pag)
 	if resposta == 0 {
 		if antiga := b.pendenteDe(chat.String(), remetente); antiga != nil {
 			b.esquecer(antiga)
 		}
 	}
 	var aviso string
+	publica := true // mostra de novo a lista (do vôlei ou de pagamento)
 	abortou := cmd == "!abortarmissao" || cmd == "!abortarmissão"
 	switch {
 	case resposta > 0:
-		var publica bool
-		if p := b.pendenteDe(chat.String(), remetente); p == nil {
-			v = nil
-		} else if aviso, publica = b.responderPergunta(p, l, resposta); !publica {
-			v = nil
+		switch p := b.pendenteDe(chat.String(), remetente); {
+		case p == nil:
+			publica = false
+		case p.pag && g.Pagamento == nil:
+			b.esquecer(p)
+			aviso, publica = semListaDePagamento, false
+		default:
+			aviso, publica = b.responderPergunta(p, l, resposta)
 		}
 	case abortou:
 		v = g.Agendar(v, "", hoje)
 		v.Zerar()
 		v.MarcarHora("")
-	case (cmd == "!paguei" || cmd == "!naopaguei" || cmd == "!nãopaguei") && !v.Cobranca:
-		aviso, v = "Essa lista não tem cobrança. Manda `!temquepagar` (ou `!temquepagar 82,20`) pra ligar.", nil
+	case (cmd == "!paguei" || cmd == "!naopaguei" || cmd == "!nãopaguei") && g.Pagamento == nil:
+		aviso, publica = semListaDePagamento, false
 	case comNome(cmd) && resto != "":
-		var publica bool
-		if aviso, publica = b.iniciar(chat.String(), remetente, cmd, resto, l); !publica {
-			v = nil
-		}
+		aviso, publica = b.iniciar(chat.String(), remetente, cmd, resto, l)
 	case cmd == "!add" || cmd == "!remove":
-		aviso, v = pedirNome(cmd), nil
+		aviso, publica = pedirNome(cmd), false
 	case cmd == "!volei" || cmd == "!vôlei":
 		campos := strings.Fields(resto)
 		if len(campos) == 0 {
@@ -290,7 +300,7 @@ func (b *Bot) aoReceber(evt *events.Message) {
 		}
 		hora, erro, temHora := LerHora(campos[len(campos)-1])
 		if erro != "" {
-			aviso, v = erro, nil
+			aviso, publica = erro, false
 			break
 		}
 		if temHora {
@@ -302,7 +312,7 @@ func (b *Bot) aoReceber(evt *events.Message) {
 		}
 		if dia, erro, ok := LerData(campos[len(campos)-1], hoje); ok {
 			if erro != "" {
-				aviso, v = erro, nil
+				aviso, publica = erro, false
 				break
 			}
 			nome := strings.TrimFunc(normaliza(strings.Join(campos[:len(campos)-1], " ")), ehAspas)
@@ -318,18 +328,16 @@ func (b *Bot) aoReceber(evt *events.Message) {
 		case "zerar":
 			v.Zerar()
 		case "config":
-			aviso, v = g.Config(), nil
+			aviso, publica = g.Elenco.Config("do Volei", "!add", "!remove"), false
 		case "ajuda", "comandos":
-			aviso, v = mensagemAjuda, nil
+			aviso, publica = mensagemAjuda, false
 		}
 	case cmd == "!temquepagar":
-		if erro := v.Cobrar(resto); erro != "" {
-			aviso, v = erro, nil
-		}
+		aviso, publica = b.comandoCobranca(chat.String(), remetente, resto, l, g, hoje, novaCobranca)
 	case cmd == "!paguei":
-		v.Pagar(idsDoRemetente(evt.Info, info.Participants), nome)
+		g.Pagamento.Pagar(idsDoRemetente(evt.Info, info.Participants), nome)
 	case cmd == "!naopaguei" || cmd == "!nãopaguei":
-		v.Despagar(idsDoRemetente(evt.Info, info.Participants))
+		g.Pagamento.Despagar(idsDoRemetente(evt.Info, info.Participants))
 	default:
 		r := Vai
 		switch cmd {
@@ -340,22 +348,28 @@ func (b *Bot) aoReceber(evt *events.Message) {
 		}
 		v.Marcar(idsDoRemetente(evt.Info, info.Participants), nome, r)
 	}
-	membros = l.membros
+	membros := l.membros
 	saida, chamada := "", ""
-	switch {
-	case v == nil:
-	case abortou:
-		saida, chamada = mensagemAbortada, "*Missão abortada*"
-	default:
-		saida, chamada = v.Render(membros, hoje), v.Chamada()
+	var hist *Historico
+	if publica {
+		switch {
+		case abortou:
+			saida, chamada, hist = mensagemAbortada, "*Missão abortada*", &v.Historico
+		case pag:
+			saida, chamada, hist = g.Pagamento.Render(membros, hoje), g.Pagamento.Chamada(), &g.Pagamento.Historico
+		default:
+			saida, chamada, hist = v.Render(membros, hoje), v.Chamada(), &v.Historico
+		}
+	} else if err := b.Salvar(); err != nil {
+		fmt.Fprintln(os.Stderr, "erro ao salvar:", err)
 	}
 	b.mu.Unlock()
 
 	if aviso != "" {
 		b.responder(chat, aviso)
 	}
-	if v != nil {
-		b.publicar(ctx, chat, eu, v, saida, chamada)
+	if hist != nil {
+		b.publicar(ctx, chat, eu, hist, saida, chamada)
 		if cmd == "!volei" || cmd == "!vôlei" {
 			// horário dentro das 2h já manda o lembrete na hora
 			b.lembrarAgora()
@@ -363,7 +377,62 @@ func (b *Bot) aoReceber(evt *events.Message) {
 	}
 }
 
-func (b *Bot) publicar(ctx context.Context, chat, eu types.JID, v *Votacao, texto, chamada string) {
+const semListaDePagamento = "Não tem lista de pagamento. Manda `!temquepagar` (ou `!temquepagar 82,20`) pra criar."
+
+// comandoCobranca trata o que vem depois de !temquepagar: configurar a lista
+// (título, data, valor, Pix), mexer em quem está nela (add/remove) ou zerar,
+// fechar, config e ajuda. novo diz que a lista acabou de ser criada por esse
+// comando. Chamar com b.mu travado.
+func (b *Bot) comandoCobranca(chat string, ids []string, resto string, l *Lista, g *Grupo, hoje time.Time, novo bool) (string, bool) {
+	campos := strings.Fields(resto)
+	sub, args := "", ""
+	if len(campos) > 0 {
+		sub = strings.ToLower(campos[0])
+		args = strings.TrimSpace(resto[len(campos[0]):])
+	}
+	desfazNovo := func() {
+		if novo {
+			g.Pagamento = nil
+		}
+	}
+	switch sub {
+	case "":
+		return "", true
+	case "add", "adicionar", "remove", "remover":
+		cmd := cmdPagAdd
+		if strings.HasPrefix(sub, "rem") {
+			cmd = cmdPagRemove
+		}
+		if args == "" {
+			return pedirNome("!temquepagar " + sub), false
+		}
+		return b.iniciar(chat, ids, cmd, args, l)
+	case "zerar":
+		g.Pagamento.Zerar()
+		return "", true
+	case "fechar", "encerrar":
+		desfazNovo()
+		if g.Pagamento == nil {
+			return semListaDePagamento, false
+		}
+		g.Pagamento = nil
+		return "Lista de pagamento encerrada. ✅ Manda `!temquepagar` pra criar outra.", false
+	case "config":
+		aviso := g.Pagamento.Elenco.Config("do Pagamento", "!temquepagar add", "!temquepagar remove")
+		desfazNovo()
+		return aviso, false
+	case "ajuda", "comandos":
+		desfazNovo()
+		return mensagemAjuda, false
+	}
+	if erro := g.Pagamento.Configurar(resto, hoje); erro != "" {
+		desfazNovo()
+		return erro, false
+	}
+	return "", true
+}
+
+func (b *Bot) publicar(ctx context.Context, chat, eu types.JID, h *Historico, texto, chamada string) {
 	resp, err := b.cli.SendMessage(ctx, chat, &waE2E.Message{
 		ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String(texto)},
 	})
@@ -375,7 +444,7 @@ func (b *Bot) publicar(ctx context.Context, chat, eu types.JID, v *Votacao, text
 	var antigas []string
 	var numero int
 	if err == nil {
-		antigas, numero = v.Registrar(resp.ID, time.Now(), time.Now().Add(-janelaEdicao))
+		antigas, numero = h.Registrar(resp.ID, time.Now(), time.Now().Add(-janelaEdicao))
 	}
 	if err := b.Salvar(); err != nil {
 		fmt.Fprintln(os.Stderr, "erro ao salvar:", err)

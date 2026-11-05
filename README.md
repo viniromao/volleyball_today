@@ -43,11 +43,16 @@ Mesmo mecanismo do `copa-volei-bot`: conecta como **aparelho conectado** usando
 | `!nao` | marca que não vai (❌) |
 | `!talvez` | marca que está na dúvida (🤔) |
 | `!eu Andressa` / `!nao Andressa Rosa` / `!talvez Andressa` | marca outra pessoa |
-| `!temquepagar` / `!temquepagar 82,20` | liga a cobrança na lista atual (e define o valor por pessoa) |
+| `!temquepagar` | cria a lista de pagamento do grupo (separada do `!volei`) ou mostra a que já existe |
+| `!temquepagar 82,20` | define o valor por pessoa |
 | `!temquepagar 82,20 chave "Nome"` | idem, com a chave Pix e o nome de quem recebe |
+| `!temquepagar churrasco 17/09 82,20 chave "Nome"` | idem, com título e data (tudo opcional, nessa ordem) |
 | `!paguei` / `!paguei Andressa` | marca que pagou (💰) |
 | `!naopaguei` / `!naopaguei Andressa` | desfaz o pagamento (volta pra 💸) |
-| `!abortarmissao` | cancela o vôlei de hoje e zera a votação |
+| `!temquepagar add Jose` / `!temquepagar remove Jose` | quem entra e quem sai da lista de pagamento (não mexe no vôlei) |
+| `!temquepagar config` | mostra quem foi tirado e quem foi incluído à mão no pagamento |
+| `!temquepagar zerar` | desmarca todos os pagamentos, mantendo valor, Pix e título |
+| `!temquepagar fechar` | encerra a lista de pagamento |
 | `!add Jose` / `!add "Jose Maria"` | adiciona um nome que não está no grupo, ou põe de volta quem foi removido |
 | `!remove Jose` / `!remove "Jose Maria"` | tira alguém da lista de vez (ou apaga um nome adicionado com `!add`) |
 | `!volei config` | mostra quem está fora da lista e quem foi incluído à mão |
@@ -96,34 +101,46 @@ só por horário — trocar o horário arma de novo. Se o horário for marcado j
 dentro das 2h, o lembrete sai na hora. Mudar a data começa sem horário; mandar
 a mesma data sem horário mantém o que estava. `!abortarmissao` tira o horário.
 
-## Cobrança
+## Lista de pagamento
 
-`!temquepagar` liga a cobrança só na lista atual — toda lista nova (dia novo,
-`!volei 17/09`, `!abortarmissao`) começa sem cobrança. Com valor
-(`!temquepagar 82,20`, também vale `82.20`, `R$ 82,20` ou `82`), aparece
-`Valor por pessoa 82,20 R$` embaixo do título; mandar de novo troca o valor.
-Depois do valor dá pra mandar a chave Pix e o nome de quem recebe (entre aspas
-ou não): `!temquepagar 82,20 fulano@email.com "Fulano de Tal"` mostra
-`Pix fulano@email.com (Fulano de Tal)` embaixo do valor. Também dá pra mandar
-só o Pix (`!temquepagar fulano@email.com "Fulano de Tal"`), e o valor fica
-como estava.
-
-Com a cobrança ligada, cada pessoa com ✅ ganha uma linha embaixo do nome:
+`!temquepagar` é uma lista própria, separada do `!volei`: cada grupo tem uma
+lista de pagamento, com seu título, data, valor, Pix, mensagens e elenco. Ela
+não depende de quem confirmou presença no vôlei e **não some na virada do dia**:
+fica até alguém mandar `!temquepagar fechar`. `!abortarmissao` e `!volei 17/09`
+não mexem nela.
 
 ```
-✅ Ana
-  💸 falta pagar
-✅ Diego
-  💰 pago
+💰 Pagamento — churrasco — Dia 17/09
+Valor por pessoa 82,20 R$
+Pix fulano@email.com (Fulano de Tal)
+
+💰 Ana
+💸 Bruno
+💸 Carla
+
+📊 Resumo
+💰 Pagaram: 1
+💸 Faltam pagar: 2
+💵 Arrecadado: R$ 82,20 de R$ 246,60
 ```
 
-O resumo no fim da lista ganha também `💰 Pagaram` e `💸 Faltam pagar`.
+Todo mundo do grupo começa com 💸. Quem não vai pagar sai com
+`!temquepagar remove Fulano`, e quem não está no grupo entra com
+`!temquepagar add Fulano` (nome composto entre aspas). Esses ajustes valem só
+pra lista de pagamento; o `!add`/`!remove` do vôlei é outro. Como nos outros
+comandos com nome, nome com várias palavras sem aspas gera uma pergunta, e
+`!paguei Fulano` oferece adicionar quem não está na lista.
 
-`!paguei` marca quem mandou (ou `!paguei Fulano` marca outra pessoa); quem paga
-sem ter confirmado vira ✅. Quem pagou e depois desistiu continua com o 💰.
-`!naopaguei` (ou `!naopaguei Fulano`) desfaz o pagamento marcado por engano,
-sem mexer na resposta da pessoa. Dá pra ligar a cobrança sem valor e mandar
-`!temquepagar 82,20` depois — o valor entra e quem já pagou continua pago.
+Configuração: `!temquepagar [título] [data] [valor] [chave Pix] ["Nome"]`, tudo
+opcional e nessa ordem; o que não vier fica como estava. O valor aceita `82,20`,
+`82.20`, `R$ 82,20` ou `82`. Mandar de novo troca o que foi enviado e quem já
+pagou continua pago.
+
+`!paguei` marca quem mandou (ou `!paguei Fulano` marca outra pessoa);
+`!naopaguei` desfaz. Quem sai da lista com `remove` perde o pagamento marcado.
+
+Listas de cobrança criadas na versão antiga (dentro do `!volei`) foram
+movidas pra lista de pagamento ao atualizar.
 
 ## Config do grupo
 

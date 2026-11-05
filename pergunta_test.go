@@ -10,7 +10,7 @@ func novaLista() (*Bot, *Lista) {
 	todos := []Membro{{IDs: []string{"1"}, Nome: "Luana"}, {IDs: []string{"2"}, Nome: "Jose"}}
 	g := &Grupo{}
 	v := g.Atual(time.Now())
-	return &Bot{}, &Lista{g: g, v: v, todos: todos, membros: g.Ajustar(todos)}
+	return &Bot{}, listaDe(g, v, todos, false)
 }
 
 func TestVariasPalavrasPerguntaFormato(t *testing.T) {
@@ -26,8 +26,8 @@ func TestVariasPalavrasPerguntaFormato(t *testing.T) {
 	if _, publica = b.responderPergunta(b.pendenteDe("g", []string{"9"}), l, 1); !publica {
 		t.Fatal("esperava publicar")
 	}
-	if len(l.g.Extras) != 1 || l.g.Extras[0] != "irmao da luana" || len(l.v.Confirmados) != 1 {
-		t.Fatalf("extras %v confirmados %v", l.g.Extras, l.v.Confirmados)
+	if len(l.e.Extras) != 1 || l.e.Extras[0] != "irmao da luana" || len(l.v.Confirmados) != 1 {
+		t.Fatalf("extras %v confirmados %v", l.e.Extras, l.v.Confirmados)
 	}
 	if b.pendenteDe("g", []string{"9"}) != nil {
 		t.Fatal("pergunta devia ter acabado")
@@ -42,7 +42,7 @@ func TestVariosNomesCancelaNoSegundo(t *testing.T) {
 		t.Fatalf("veio %q", aviso)
 	}
 	aviso, publica := b.responderPergunta(b.pendenteDe("g", []string{"9"}), l, 2)
-	if publica || aviso != cancelado || len(l.v.Confirmados) != 0 || len(l.g.Extras) != 0 {
+	if publica || aviso != cancelado || len(l.v.Confirmados) != 0 || len(l.e.Extras) != 0 {
 		t.Fatalf("cancelar devia não fazer nada: %q %v", aviso, l.v.Confirmados)
 	}
 }
@@ -52,7 +52,7 @@ func TestNomeSoOuComAspasNaoPergunta(t *testing.T) {
 	if _, publica := b.iniciar("g", []string{"9"}, "!eu", "luana", l); !publica || len(l.v.Confirmados) != 1 {
 		t.Fatal("nome único existente devia marcar direto")
 	}
-	if aviso, _ := b.iniciar("g", []string{"9"}, "!add", `"irmao da luana"`, l); aviso != "" || len(l.g.Extras) != 1 {
+	if aviso, _ := b.iniciar("g", []string{"9"}, "!add", `"irmao da luana"`, l); aviso != "" || len(l.e.Extras) != 1 {
 		t.Fatalf("aspas devia adicionar direto: %q", aviso)
 	}
 }

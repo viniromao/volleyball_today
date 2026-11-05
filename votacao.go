@@ -24,7 +24,7 @@ const mensagemAjuda = "🏐 *Comandos do bot do Volei*\n\n" +
 	"• `!nao` — não vou (❌)\n" +
 	"• `!talvez` — tô na dúvida (🤔)\n" +
 	"• `!eu Fulano`, `!nao Fulano`, `!talvez Fulano` — marca outra pessoa. Vale um pedaço do nome, sem ligar pra maiúscula nem acento. Se tiver mais de um com o nome, o bot mostra as opções numeradas e você manda `!eu jose 2`.\n" +
-	"Nome com várias palavras sem aspas (`!eu irmao da luana`): o bot pergunta se é uma pessoa só ou várias e você responde com o número da opção. Se a pessoa não estiver na lista, ele pergunta se é pra adicionar (e dá pra cancelar). Vale pra `!add`, `!remove`, `!paguei` e `!naopaguei` também.\n" +
+	"Nome com várias palavras sem aspas (`!eu irmao da luana`): o bot pergunta se é uma pessoa só ou várias e você responde com o número da opção. Se a pessoa não estiver na lista, ele pergunta se é pra adicionar (e dá pra cancelar). Vale pra `!add`, `!remove`, `!paguei`, `!naopaguei` e `!temquepagar add/remove` também.\n" +
 	"Dá pra trocar a resposta quantas vezes quiser, vale a última.\n\n" +
 	"*Lista*\n" +
 	"• `!volei` — mostra a lista (a de hoje, ou a do dia marcado)\n" +
@@ -35,13 +35,18 @@ const mensagemAjuda = "🏐 *Comandos do bot do Volei*\n\n" +
 	"• `!volei semhora` — tira o horário (e o lembrete e a previsão)\n" +
 	"• `!volei zerar` — limpa as respostas, mantendo dia e nome\n" +
 	"• `!abortarmissao` — cancela o evento e volta pro vôlei de hoje, do zero\n\n" +
-	"*Pagamento*\n" +
-	"• `!temquepagar` — liga a cobrança na lista atual: quem vai ganha 💸 embaixo do nome\n" +
-	"• `!temquepagar 82,20` — idem, mostrando o valor por pessoa embaixo do título\n" +
+	"*Pagamento* (lista própria, separada do `!volei`)\n" +
+	"• `!temquepagar` — cria a lista de pagamento do grupo (ou mostra a que já existe). Todo mundo do grupo começa com 💸 (falta pagar)\n" +
+	"• `!temquepagar 82,20` — define o valor por pessoa\n" +
 	"• `!temquepagar 82,20 fulano@email.com \"Fulano de Tal\"` — idem, com a chave Pix e o nome de quem recebe\n" +
-	"• `!paguei` / `!paguei Fulano` — marca que pagou (💰); quem paga sem ter confirmado vira ✅\n" +
-	"• `!naopaguei` / `!naopaguei Fulano` — desfaz o pagamento (volta pra 💸)\n" +
-	"Dá pra ligar sem valor e mandar `!temquepagar 82,20` depois; mandar de novo troca o valor. Toda lista nova começa sem cobrança.\n\n" +
+	"• `!temquepagar churrasco 17/09 82,20 chave \"Nome\"` — idem, com título e data. Tudo é opcional, nessa ordem, e o que não vier fica como estava\n" +
+	"• `!paguei` / `!paguei Fulano` — marca que pagou (💰)\n" +
+	"• `!naopaguei` / `!naopaguei Fulano` — desfaz (volta pra 💸)\n" +
+	"• `!temquepagar add Fulano` / `!temquepagar remove Fulano` — quem entra e quem sai da lista de pagamento (não mexe na lista do vôlei)\n" +
+	"• `!temquepagar config` — mostra quem foi tirado e quem foi incluído à mão\n" +
+	"• `!temquepagar zerar` — desmarca todos os pagamentos, mantendo valor, Pix e título\n" +
+	"• `!temquepagar fechar` — encerra a lista de pagamento\n" +
+	"A lista de pagamento não some com a virada do dia: fica até alguém fechar.\n\n" +
 	"*Quem aparece na lista* (fica guardado pro grupo, vale todo dia)\n" +
 	"• `!add Jose` — adiciona alguém que não está no grupo, ou põe de volta quem foi removido\n" +
 	"• `!remove Jose` — tira alguém da lista de vez\n" +
@@ -54,7 +59,7 @@ type Confirmado struct {
 	Nome   string   `json:"nome"`
 	Nao    bool     `json:"nao,omitempty"`
 	Talvez bool     `json:"talvez,omitempty"`
-	Pago   bool     `json:"pago,omitempty"`
+	Pago   bool     `json:"pago,omitempty"` // só pra ler dados antigos, veja Carregar
 }
 
 type Resposta int
@@ -64,6 +69,20 @@ const (
 	NaoVai
 	Talvez
 )
+
+// Respostas é uma lista de pessoas (a do vôlei ou a de pagamento) sobre a qual
+// !add e !remove rodam.
+type Respostas interface {
+	linhas(membros []Membro) []linha
+	Desmarcar(ids []string)
+}
+
+// Historico guarda as mensagens que o bot mandou com a lista, pra editar as
+// antigas apontando pra mais nova.
+type Historico struct {
+	Mensagens []Mensagem `json:"mensagens"`
+	Envios    int        `json:"envios,omitempty"`
+}
 
 type Mensagem struct {
 	ID string    `json:"id"`
@@ -77,13 +96,15 @@ type Votacao struct {
 	Hora        string       `json:"hora,omitempty"`
 	Lembrado    bool         `json:"lembrado,omitempty"`
 	ChuvaAvisos int          `json:"chuvaAvisos,omitempty"` // bit k ligado = janela de k horas antes já tratada
-	Cobranca    bool         `json:"cobranca,omitempty"`
-	Valor       string       `json:"valor,omitempty"`
-	Pix         string       `json:"pix,omitempty"`
-	Favorecido  string       `json:"favorecido,omitempty"`
 	Confirmados []Confirmado `json:"confirmados"`
-	Mensagens   []Mensagem   `json:"mensagens"`
-	Envios      int          `json:"envios,omitempty"`
+	Historico
+
+	// Só pra ler dados antigos: a cobrança morava dentro da votação. Carregar
+	// move isso pra lista de pagamento do grupo (Grupo.Pagamento).
+	Cobranca   bool   `json:"cobranca,omitempty"`
+	Valor      string `json:"valor,omitempty"`
+	Pix        string `json:"pix,omitempty"`
+	Favorecido string `json:"favorecido,omitempty"`
 }
 
 type Pessoa struct {
@@ -91,10 +112,18 @@ type Pessoa struct {
 	Nome string   `json:"nome"`
 }
 
+// Elenco é quem aparece numa lista além dos membros do grupo: quem foi tirado
+// com remove e quem foi incluído à mão com add. O vôlei e o pagamento têm cada
+// um o seu.
+type Elenco struct {
+	Ocultos []Pessoa `json:"ocultos,omitempty"`
+	Extras  []string `json:"extras,omitempty"`
+}
+
 type Grupo struct {
-	Votacoes []*Votacao `json:"votacoes"`
-	Ocultos  []Pessoa   `json:"ocultos,omitempty"`
-	Extras   []string   `json:"extras,omitempty"`
+	Votacoes  []*Votacao `json:"votacoes"`
+	Pagamento *Cobranca  `json:"pagamento,omitempty"`
+	Elenco
 }
 
 const prefixoExtra = "extra:"
@@ -105,7 +134,7 @@ func idExtra(nome string) string {
 
 // Ajustar tira da lista quem foi escondido com !remove e põe os nomes
 // incluídos à mão com !add.
-func (g *Grupo) Ajustar(membros []Membro) []Membro {
+func (g *Elenco) Ajustar(membros []Membro) []Membro {
 	var out []Membro
 	for _, m := range membros {
 		if !g.oculto(m.IDs) {
@@ -118,7 +147,7 @@ func (g *Grupo) Ajustar(membros []Membro) []Membro {
 	return out
 }
 
-func (g *Grupo) oculto(ids []string) bool {
+func (g *Elenco) oculto(ids []string) bool {
 	for _, o := range g.Ocultos {
 		if temAlgum(o.IDs, ids) {
 			return true
@@ -127,8 +156,8 @@ func (g *Grupo) oculto(ids []string) bool {
 	return false
 }
 
-func (g *Grupo) Tirar(v *Votacao, membros []Membro, busca string) string {
-	ln, erro, _ := buscar(v.linhas(membros), busca)
+func (g *Elenco) Tirar(r Respostas, membros []Membro, busca string) string {
+	ln, erro, _ := buscar(r.linhas(membros), busca)
 	if erro != "" {
 		return erro
 	}
@@ -142,11 +171,11 @@ func (g *Grupo) Tirar(v *Votacao, membros []Membro, busca string) string {
 	} else {
 		g.Ocultos = append(g.Ocultos, Pessoa{IDs: ln.ids, Nome: ln.nome})
 	}
-	v.Desmarcar(ln.ids)
+	r.Desmarcar(ln.ids)
 	return ""
 }
 
-func (g *Grupo) Incluir(membros []Membro, nome string) string {
+func (g *Elenco) Incluir(membros []Membro, nome string) string {
 	nome = normaliza(nome)
 	var ocultos []linha
 	for _, o := range g.Ocultos {
@@ -172,9 +201,11 @@ func (g *Grupo) Incluir(membros []Membro, nome string) string {
 	return ""
 }
 
-func (g *Grupo) Config() string {
+// Config mostra quem foi tirado e quem foi incluído à mão; cmd é o prefixo dos
+// comandos de add/remove dessa lista.
+func (g *Elenco) Config(titulo, add, remove string) string {
 	var b strings.Builder
-	b.WriteString("⚙️ *Config do Volei neste grupo*\n\n")
+	fmt.Fprintf(&b, "⚙️ *Config %s neste grupo*\n\n", titulo)
 	var ocultos []string
 	for _, o := range g.Ocultos {
 		ocultos = append(ocultos, o.Nome)
@@ -183,7 +214,7 @@ func (g *Grupo) Config() string {
 	b.WriteString(ouNinguem(ocultos))
 	b.WriteString("\nIncluídos à mão: ")
 	b.WriteString(ouNinguem(g.Extras))
-	b.WriteString("\n\n`!remove Fulano` tira alguém da lista, `!add Fulano` põe de volta ou adiciona quem não está no grupo. Nome composto vai entre aspas: `!add \"Jose Maria\"`.")
+	fmt.Fprintf(&b, "\n\n`%s Fulano` tira alguém da lista, `%s Fulano` põe de volta ou adiciona quem não está no grupo. Nome composto vai entre aspas: `%s \"Jose Maria\"`.", remove, add, add)
 	return b.String()
 }
 
@@ -372,7 +403,7 @@ func (g *Grupo) Atual(hoje time.Time) *Votacao {
 // o dia é o mesmo. As mensagens passam junto pra lista antiga apontar pra nova.
 func (g *Grupo) Agendar(v *Votacao, nome string, dia time.Time) *Votacao {
 	if data := dia.Format(formatoData); v.Data != data {
-		v = &Votacao{Dia: dia.Format(formatoDia), Data: data, Mensagens: v.Mensagens, Envios: v.Envios}
+		v = &Votacao{Dia: dia.Format(formatoDia), Data: data, Historico: v.Historico}
 		g.Votacoes = []*Votacao{v}
 	}
 	v.Nome = nome
@@ -397,22 +428,22 @@ func (v *Votacao) Zerar() {
 	v.Confirmados = nil
 }
 
-func (v *Votacao) Registrar(id string, em, limite time.Time) ([]string, int) {
+func (h *Historico) Registrar(id string, em, limite time.Time) ([]string, int) {
 	var editaveis []string
-	for _, m := range v.Mensagens {
+	for _, m := range h.Mensagens {
 		if m.Em.After(limite) {
 			editaveis = append(editaveis, m.ID)
 		}
 	}
-	if v.Envios < len(v.Mensagens) {
-		v.Envios = len(v.Mensagens)
+	if h.Envios < len(h.Mensagens) {
+		h.Envios = len(h.Mensagens)
 	}
-	v.Envios++
-	v.Mensagens = append(v.Mensagens, Mensagem{ID: id, Em: em})
-	if len(v.Mensagens) > maxMensagens {
-		v.Mensagens = v.Mensagens[len(v.Mensagens)-maxMensagens:]
+	h.Envios++
+	h.Mensagens = append(h.Mensagens, Mensagem{ID: id, Em: em})
+	if len(h.Mensagens) > maxMensagens {
+		h.Mensagens = h.Mensagens[len(h.Mensagens)-maxMensagens:]
 	}
-	return editaveis, v.Envios
+	return editaveis, h.Envios
 }
 
 func (v *Votacao) indice(ids []string) int {
@@ -449,10 +480,9 @@ func (v *Votacao) Marcar(ids []string, nome string, r Resposta) {
 }
 
 type linha struct {
-	ids       []string
-	nome      string
-	marca     string
-	pagamento string
+	ids   []string
+	nome  string
+	marca string
 }
 
 var semAcento = strings.NewReplacer(
@@ -478,95 +508,6 @@ func (c Confirmado) marca() string {
 	return "✅"
 }
 
-const (
-	pago       = "💰 pago"
-	faltaPagar = "💸 falta pagar"
-)
-
-// pagamento é a linha que vai embaixo do nome quando a lista tem cobrança:
-// quem vai e não pagou fica com 💸; quem pagou fica com 💰 mesmo se desistiu.
-func (v *Votacao) pagamento(c Confirmado) string {
-	switch {
-	case !v.Cobranca:
-		return ""
-	case c.Pago:
-		return pago
-	case !c.Nao && !c.Talvez:
-		return faltaPagar
-	}
-	return ""
-}
-
-// Cobrar liga a cobrança na votação atual. O que vier depois é opcional:
-// valor por pessoa, chave Pix e nome de quem recebe, nessa ordem
-// (`87,29 14357877733 "Vinicius Romao"`); o que não vier fica como estava.
-func (v *Votacao) Cobrar(args string) string {
-	campos := strings.Fields(args)
-	if len(campos) > 1 && strings.EqualFold(campos[0], "r$") {
-		campos = append([]string{"R$" + campos[1]}, campos[2:]...)
-	}
-	if len(campos) > 0 {
-		if centavos, ok := lerValor(campos[0]); ok {
-			v.Valor = fmt.Sprintf("%d,%02d", centavos/100, centavos%100)
-			campos = campos[1:]
-		} else if len(campos) == 1 && !pareceChavePix(campos[0]) {
-			return fmt.Sprintf("Não entendi o valor *%s*. Manda assim: `!temquepagar 82,20`.", campos[0])
-		}
-	}
-	if len(campos) > 0 {
-		v.Pix = campos[0]
-		v.Favorecido = strings.TrimFunc(strings.Join(campos[1:], " "), ehAspas)
-	}
-	v.Cobranca = true
-	return ""
-}
-
-// pareceChavePix separa uma chave Pix (CPF, telefone, e-mail, aleatória) de
-// um valor digitado errado, pra `!temquepagar 82,2x` ainda dar erro.
-func pareceChavePix(s string) bool {
-	if strings.Contains(s, "@") || strings.Count(s, "-") >= 4 {
-		return true
-	}
-	digitos := 0
-	for _, r := range s {
-		if unicode.IsDigit(r) {
-			digitos++
-		}
-	}
-	return digitos >= 8
-}
-
-var reValor = regexp.MustCompile(`(?i)^(?:r\$)?\s*(\d{1,6})(?:[.,](\d{1,2}))?\s*(?:r\$)?$`)
-
-func lerValor(s string) (int, bool) {
-	m := reValor.FindStringSubmatch(s)
-	if m == nil {
-		return 0, false
-	}
-	reais, _ := strconv.Atoi(m[1])
-	centavos := 0
-	if m[2] != "" {
-		centavos, _ = strconv.Atoi(m[2])
-		if len(m[2]) == 1 {
-			centavos *= 10
-		}
-	}
-	return reais*100 + centavos, true
-}
-
-// Pagar marca que a pessoa pagou; quem paga passa a constar como quem vai.
-func (v *Votacao) Pagar(ids []string, nome string) {
-	v.Marcar(ids, nome, Vai)
-	v.Confirmados[v.indice(ids)].Pago = true
-}
-
-// Despagar desfaz um !paguei, sem mexer na resposta da pessoa.
-func (v *Votacao) Despagar(ids []string) {
-	if i := v.indice(ids); i >= 0 {
-		v.Confirmados[i].Pago = false
-	}
-}
-
 func (v *Votacao) linhas(membros []Membro) []linha {
 	var out []linha
 	vistos := map[int]bool{}
@@ -584,14 +525,20 @@ func (v *Votacao) linhas(membros []Membro) []linha {
 		if nome == "" {
 			nome = m.Nome
 		}
-		out = append(out, linha{ids: m.IDs, nome: nome, marca: c.marca(), pagamento: v.pagamento(c)})
+		out = append(out, linha{ids: m.IDs, nome: nome, marca: c.marca()})
 	}
 	for i, c := range v.Confirmados {
 		if !vistos[i] {
-			out = append(out, linha{ids: c.IDs, nome: c.Nome, marca: c.marca(), pagamento: v.pagamento(c)})
+			out = append(out, linha{ids: c.IDs, nome: c.Nome, marca: c.marca()})
 		}
 	}
-	// Nome igual desempata pelos IDs, pra "jose 2" ser sempre a mesma pessoa.
+	ordena(out)
+	return out
+}
+
+// ordena põe as linhas em ordem de nome. Nome igual desempata pelos IDs, pra
+// "jose 2" ser sempre a mesma pessoa.
+func ordena(out []linha) {
 	sort.SliceStable(out, func(i, j int) bool {
 		a, b := simplifica(out[i].nome), simplifica(out[j].nome)
 		if a != b {
@@ -599,11 +546,10 @@ func (v *Votacao) linhas(membros []Membro) []linha {
 		}
 		return strings.Join(out[i].ids, ",") < strings.Join(out[j].ids, ",")
 	})
-	return out
 }
 
-func (v *Votacao) Encontrar(membros []Membro, busca string) ([]string, string) {
-	ln, erro, _ := buscar(v.linhas(membros), busca)
+func encontrar(r Respostas, membros []Membro, busca string) ([]string, string) {
+	ln, erro, _ := buscar(r.linhas(membros), busca)
 	return ln.ids, erro
 }
 
@@ -677,31 +623,14 @@ func (v *Votacao) Render(membros []Membro, hoje time.Time) string {
 		quando += " às " + v.horario()
 	}
 	fmt.Fprintf(&b, "🏐 *%s — %s*\n", v.Evento(), quando)
-	if v.Cobranca && v.Valor != "" {
-		fmt.Fprintf(&b, "Valor por pessoa %s R$\n", v.Valor)
-	}
-	if v.Cobranca && v.Pix != "" {
-		fmt.Fprintf(&b, "Pix %s", v.Pix)
-		if v.Favorecido != "" {
-			fmt.Fprintf(&b, " (%s)", v.Favorecido)
-		}
-		b.WriteString("\n")
-	}
 	b.WriteString("\n")
 	conta := map[string]int{}
 	for _, ln := range linhas {
 		fmt.Fprintf(&b, "%s %s\n", ln.marca, ln.nome)
-		if ln.pagamento != "" {
-			fmt.Fprintf(&b, "  %s\n", ln.pagamento)
-		}
 		conta[ln.marca]++
-		conta[ln.pagamento]++
 	}
 	fmt.Fprintf(&b, "\n📊 *Resumo*\n✅ Confirmados: %d\n🤔 Talvez: %d\n❌ Não vão: %d\n▫️ Sem resposta: %d\n",
 		conta["✅"], conta["🤔"], conta["❌"], conta["▫️"])
-	if v.Cobranca {
-		fmt.Fprintf(&b, "💰 Pagaram: %d\n💸 Faltam pagar: %d\n", conta[pago], conta[faltaPagar])
-	}
 	onde := ""
 	switch {
 	case v.Nome != "":
@@ -711,9 +640,6 @@ func (v *Votacao) Render(membros []Membro, hoje time.Time) string {
 		onde = " no vôlei do dia " + v.Dia
 	}
 	fmt.Fprintf(&b, "\nComente `!eu` pra confirmar presença%s, `!talvez` se estiver na dúvida ou `!nao` se não for. Dá pra trocar quantas vezes quiser.", onde)
-	if v.Cobranca {
-		b.WriteString(" Quem já pagou manda `!paguei`.")
-	}
 	return b.String()
 }
 
