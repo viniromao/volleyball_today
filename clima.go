@@ -170,7 +170,7 @@ func (i Intensidade) Texto() string {
 	case MuitoFraca:
 		return "🌦️ Chuvisco bem fraquinho, dá pra jogar de boa"
 	case Fraca:
-		return "🌧️ Chuva fraca, dá pra jogar (a quadra pode ficar molhada)"
+		return "🌧️ Chuva fraca, dá pra jogar"
 	case Media:
 		return "🌧️ Chuva média, vai molhar e o jogo fica complicado"
 	case Forte:
@@ -191,12 +191,12 @@ func (p Previsao) PedeAlerta() bool {
 // MensagemClima monta o aviso. k == 1 é a previsão de 1h antes (sempre sai);
 // k de 2 a 4 é o alerta antecipado, que só sai se PedeAlerta.
 func (v *Votacao) MensagemClima(p Previsao, k int) string {
-	cabeca := fmt.Sprintf("Previsão de *%s* pro *%s* às %s", nomeLocal, v.Evento(), v.horario())
+	onde := fmt.Sprintf("*%s* às %s", nomeLocal, v.horario())
 	if k > 1 {
-		cabeca += fmt.Sprintf(" (daqui a %dh)", k)
+		onde += fmt.Sprintf(" (daqui a %dh)", k)
 	}
-	return fmt.Sprintf("%s!\n%s: *%d%%* de chance de chuva, cerca de %s mm na hora, %.0f°C.",
-		ClassificarChuva(p.Mm).Texto(), cabeca, p.Chance, virgula(p.Mm), p.Temp)
+	return fmt.Sprintf("🌤️ *Previsão do Tempo pro %s*\n\n%s!\n%s: *%d%%* de chance de chuva, cerca de %s mm na hora, %.0f°C.",
+		v.Evento(), ClassificarChuva(p.Mm).Texto(), onde, p.Chance, virgula(p.Mm), p.Temp)
 }
 
 // avisarClima confere de tempos em tempos se falta 1h (previsão) ou 2h a 4h
