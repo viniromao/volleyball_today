@@ -173,10 +173,19 @@ func (c *Cobranca) Desmarcar(ids []string) { c.Despagar(ids) }
 func (c *Cobranca) Zerar() { c.Pagantes = nil }
 
 func (c *Cobranca) linhas(membros []Membro) []linha {
+	// O dono da conta do bot não aparece, a não ser que ninguém mais esteja
+	// na lista (grupo só com ele): aí a lista não pode ficar vazia.
+	incluiProprio := true
+	for _, m := range membros {
+		if !m.Proprio {
+			incluiProprio = false
+			break
+		}
+	}
 	var out []linha
 	vistos := map[int]bool{}
 	for _, m := range membros {
-		if m.Proprio {
+		if m.Proprio && !incluiProprio {
 			continue
 		}
 		i := c.indice(m.IDs)

@@ -123,3 +123,15 @@ func TestMigrarCobrancaAntiga(t *testing.T) {
 		t.Fatal("cobrança velha devia sumir")
 	}
 }
+
+func TestPagamentoNaoFicaVazio(t *testing.T) {
+	c := &Cobranca{}
+	so := []Membro{{IDs: []string{"1"}, Nome: "Vinicius", Proprio: true}}
+	if ln := c.linhas(so); len(ln) != 1 || ln[0].marca != faltaPagar {
+		t.Fatalf("grupo só com o dono devia listar ele: %v", ln)
+	}
+	com := append(so, Membro{IDs: []string{"2"}, Nome: "Ana"})
+	if ln := c.linhas(com); len(ln) != 1 || ln[0].nome != "Ana" {
+		t.Fatalf("com mais gente o dono continua de fora: %v", ln)
+	}
+}
