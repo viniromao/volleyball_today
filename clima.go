@@ -23,10 +23,12 @@ const (
 	maxAntecedenciaClima = 4
 	validadeCache        = 10 * time.Minute
 
-	// Osasco/SP, dá pra trocar com VOLEI_LAT e VOLEI_LON
-	latPadrao = "-23.5325"
-	lonPadrao = "-46.7917"
+	// Presidente Altino, Osasco/SP; dá pra trocar com VOLEI_LAT, VOLEI_LON e VOLEI_LOCAL
+	latPadrao = "-23.5262"
+	lonPadrao = "-46.7686"
 )
+
+var nomeLocal = envOu("VOLEI_LOCAL", "Presidente Altino")
 
 type Previsao struct {
 	Chance int     // probabilidade de chuva, em %
@@ -138,8 +140,8 @@ func virgula(f float64) string {
 // k de 2 a 4 é o alerta de chuva forte, que só sai se a chance for grande.
 func (v *Votacao) MensagemClima(p Previsao, k int) string {
 	if k > 1 {
-		return fmt.Sprintf("☔ Atenção: a previsão pro *%s* às %s (daqui a %dh) tem *%d%%* de chance de chuva (%s mm). Vale ficar de olho!",
-			v.Evento(), v.horario(), k, p.Chance, virgula(p.Mm))
+		return fmt.Sprintf("☔ Atenção: a previsão de *%s* pro *%s* às %s (daqui a %dh) tem *%d%%* de chance de chuva (%s mm). Vale ficar de olho!",
+			nomeLocal, v.Evento(), v.horario(), k, p.Chance, virgula(p.Mm))
 	}
 	var situacao string
 	switch {
@@ -150,8 +152,8 @@ func (v *Votacao) MensagemClima(p Previsao, k int) string {
 	default:
 		situacao = "☀️ Tempo firme"
 	}
-	return fmt.Sprintf("%s! Previsão pro *%s* às %s: *%d%%* de chance de chuva (%s mm), %.0f°C.",
-		situacao, v.Evento(), v.horario(), p.Chance, virgula(p.Mm), p.Temp)
+	return fmt.Sprintf("%s! Previsão de *%s* pro *%s* às %s: *%d%%* de chance de chuva (%s mm), %.0f°C.",
+		situacao, nomeLocal, v.Evento(), v.horario(), p.Chance, virgula(p.Mm), p.Temp)
 }
 
 // avisarClima confere de tempos em tempos se falta 1h (previsão) ou 2h a 4h

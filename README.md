@@ -214,4 +214,4 @@ Com horário marcado, o bot consulta o [Open-Meteo](https://open-meteo.com) (gr�
 - **4h, 3h e 2h antes**: só manda um alerta se a chance de chuva for de 60% pra cima.
 
 Cada janela avisa uma vez só; trocar o horário recomeça. Sem horário, não manda nada.
-Por padrão usa as coordenadas de Osasco; dá pra trocar com `VOLEI_LAT` e `VOLEI_LON`.
+Por padrão usa as coordenadas de Presidente Altino (Osasco) e as mensagens dizem que a previsão é de lá; dá pra trocar com `VOLEI_LAT`, `VOLEI_LON` e `VOLEI_LOCAL`.
