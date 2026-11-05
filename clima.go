@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	// chance de chuva (%) a partir da qual o bot avisa com 4h, 3h e 2h de antecedência
+	// chance de chuva (%) a partir da qual o bot pode avisar com 4h, 3h e 2h de antecedência
 	limiarChuva = 60
 	// o aviso com a previsão sai quando falta 1h; os de alerta, de 4h até 2h
 	maxAntecedenciaClima = 4
@@ -136,24 +136,67 @@ func virgula(f float64) string {
 	return strings.Replace(fmt.Sprintf("%.1f", f), ".", ",", 1)
 }
 
-// MensagemClima monta o aviso. k == 1 é a previsão de 1h antes (sempre sai);
-// k de 2 a 4 é o alerta de chuva forte, que só sai se a chance for grande.
-func (v *Votacao) MensagemClima(p Previsao, k int) string {
-	if k > 1 {
-		return fmt.Sprintf("☔ Atenção: a previsão de *%s* pro *%s* às %s (daqui a %dh) tem *%d%%* de chance de chuva (%s mm). Vale ficar de olho!",
-			nomeLocal, v.Evento(), v.horario(), k, p.Chance, virgula(p.Mm))
-	}
-	var situacao string
+// Intensidade classifica a chuva pela quantidade esperada na hora (mm/h).
+type Intensidade int
+
+const (
+	SemChuva Intensidade = iota
+	MuitoFraca
+	Fraca
+	Media
+	Forte
+	MuitoForte
+)
+
+func ClassificarChuva(mm float64) Intensidade {
 	switch {
-	case p.Chance >= limiarChuva:
-		situacao = "☔ Chuva forte no radar"
-	case p.Chance >= 30:
-		situacao = "🌦️ Pode chover"
+	case mm < 0.1:
+		return SemChuva
+	case mm < 0.5:
+		return MuitoFraca
+	case mm < 2.5:
+		return Fraca
+	case mm < 7.6:
+		return Media
+	case mm < 20:
+		return Forte
 	default:
-		situacao = "☀️ Tempo firme"
+		return MuitoForte
 	}
-	return fmt.Sprintf("%s! Previsão de *%s* pro *%s* às %s: *%d%%* de chance de chuva (%s mm), %.0f°C.",
-		situacao, nomeLocal, v.Evento(), v.horario(), p.Chance, virgula(p.Mm), p.Temp)
+}
+
+func (i Intensidade) Texto() string {
+	switch i {
+	case MuitoFraca:
+		return "🌦️ Chuvisco bem fraquinho, dá pra jogar de boa"
+	case Fraca:
+		return "🌧️ Chuva fraca, dá pra jogar (a quadra pode ficar molhada)"
+	case Media:
+		return "🌧️ Chuva média, vai molhar e o jogo fica complicado"
+	case Forte:
+		return "⛈️ Chuva forte, esquece o jogo"
+	case MuitoForte:
+		return "🌊 Chuva muito forte, deus nos acuda!"
+	default:
+		return "☀️ Sem chuva prevista"
+	}
+}
+
+// PedeAlerta diz se vale o aviso antecipado (4h a 2h): chuva provável e que
+// atrapalhe, ou seja, de fraca pra cima. Chuvisco não merece alerta.
+func (p Previsao) PedeAlerta() bool {
+	return p.Chance >= limiarChuva && ClassificarChuva(p.Mm) >= Fraca
+}
+
+// MensagemClima monta o aviso. k == 1 é a previsão de 1h antes (sempre sai);
+// k de 2 a 4 é o alerta antecipado, que só sai se PedeAlerta.
+func (v *Votacao) MensagemClima(p Previsao, k int) string {
+	cabeca := fmt.Sprintf("Previsão de *%s* pro *%s* às %s", nomeLocal, v.Evento(), v.horario())
+	if k > 1 {
+		cabeca += fmt.Sprintf(" (daqui a %dh)", k)
+	}
+	return fmt.Sprintf("%s!\n%s: *%d%%* de chance de chuva, cerca de %s mm na hora, %.0f°C.",
+		ClassificarChuva(p.Mm).Texto(), cabeca, p.Chance, virgula(p.Mm), p.Temp)
 }
 
 // avisarClima confere de tempos em tempos se falta 1h (previsão) ou 2h a 4h
@@ -214,7 +257,7 @@ func (b *Bot) climaAgora() {
 		}
 		a.v.ChuvaAvisos |= 1 << a.k
 		var texto string
-		if a.k == 1 || prev.Chance >= limiarChuva {
+		if a.k == 1 || prev.PedeAlerta() {
 			texto = a.v.MensagemClima(prev, a.k)
 		}
 		if err := b.Salvar(); err != nil {

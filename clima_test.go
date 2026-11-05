@@ -42,10 +42,36 @@ func TestLerPrevisao(t *testing.T) {
 	}
 }
 
+func TestClassificarChuva(t *testing.T) {
+	casos := []struct {
+		mm   float64
+		want Intensidade
+	}{
+		{0, SemChuva}, {0.04, SemChuva}, {0.1, MuitoFraca}, {0.49, MuitoFraca},
+		{0.5, Fraca}, {2.4, Fraca}, {2.5, Media}, {7.5, Media},
+		{7.6, Forte}, {19.9, Forte}, {20, MuitoForte}, {45, MuitoForte},
+	}
+	for _, c := range casos {
+		if got := ClassificarChuva(c.mm); got != c.want {
+			t.Errorf("%v mm: %d, esperava %d", c.mm, got, c.want)
+		}
+	}
+}
+
+func TestPedeAlerta(t *testing.T) {
+	if (Previsao{Chance: 75, Mm: 0.1}).PedeAlerta() {
+		t.Error("chuvisco não deveria alertar")
+	}
+	if !(Previsao{Chance: 75, Mm: 1.2}).PedeAlerta() {
+		t.Error("chuva fraca com chance alta deveria alertar")
+	}
+	if (Previsao{Chance: 40, Mm: 5}).PedeAlerta() {
+		t.Error("chance baixa não deveria alertar")
+	}
+}
+
 func TestMensagemClima(t *testing.T) {
 	v := &Votacao{Hora: "19:00"}
-	if m := v.MensagemClima(Previsao{Chance: 80, Mm: 2.5, Temp: 20}, 3); m == "" {
-		t.Fatal("mensagem vazia")
-	}
-	t.Log(v.MensagemClima(Previsao{Chance: 80, Mm: 2.5, Temp: 20}, 1))
+	t.Log("\n" + v.MensagemClima(Previsao{Chance: 75, Mm: 0.1, Temp: 20}, 1))
+	t.Log("\n" + v.MensagemClima(Previsao{Chance: 80, Mm: 9.3, Temp: 20}, 3))
 }

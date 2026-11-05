@@ -211,7 +211,8 @@ ssh usuario@vps 'journalctl -u volei-hoje-bot -f'
 Com horário marcado, o bot consulta o [Open-Meteo](https://open-meteo.com) (grátis, sem chave):
 
 - **1h antes**: sempre manda a previsão pro horário do jogo (chance de chuva, mm e temperatura).
-- **4h, 3h e 2h antes**: só manda um alerta se a chance de chuva for de 60% pra cima.
+- **4h, 3h e 2h antes**: só manda um alerta se a chance de chuva for de 60% pra cima e a chuva for de fraca pra cima (chuvisco não alerta).
+- A mensagem diz quão forte é a chuva, pelos mm esperados na hora: menos de 0,1 sem chuva, até 0,5 chuvisco (dá pra jogar), até 2,5 fraca, até 7,6 média, até 20 forte, acima disso muito forte.
 
 Cada janela avisa uma vez só; trocar o horário recomeça. Sem horário, não manda nada.
 Por padrão usa as coordenadas de Presidente Altino (Osasco) e as mensagens dizem que a previsão é de lá; dá pra trocar com `VOLEI_LAT`, `VOLEI_LON` e `VOLEI_LOCAL`.
